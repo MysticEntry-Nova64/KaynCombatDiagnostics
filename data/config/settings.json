@@ -1,0 +1,5 @@
+{
+  "plugins": {
+    "kayn_combat_diagnostics": "kayn.diagnostics.CombatDiagnostics"
+  }
+}

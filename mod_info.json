@@ -1,0 +1,17 @@
+{
+  "id": "kayn_combat_diagnostics",
+  "name": "Kayn Combat Diagnostics",
+  "author": "Minsu / Kayn",
+  "version": "1.0.0",
+  "gameVersion": "0.98a-RC8",
+  "description": "Optional live diagnostics for any controlled or targeted ship. Ctrl+F8 toggles; Ctrl+F9 target/self; Ctrl+F10 next weapon page.",
+  "jars": [
+    "jars/kayn-combat-diagnostics.jar"
+  ],
+  "dependencies": [
+    {
+      "id": "lw_lazylib",
+      "name": "LazyLib"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+/build/
+/jars/
+/dist/
+*.class
+*.log
+*.tsv.data
