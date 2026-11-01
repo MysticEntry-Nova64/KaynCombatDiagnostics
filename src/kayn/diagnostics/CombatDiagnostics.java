@@ -31,49 +31,54 @@ public class CombatDiagnostics extends BaseEveryFrameCombatPlugin {
     private ShipAPI pinned;
     private int page;
     private String stopReason = "";
+    private String observationWarning = "";
     private final Map<WeaponAPI, WeaponDiagnostics> weaponRows = new IdentityHashMap<>();
+    private final Map<String, String> publishedRows = new HashMap<>();
     public CombatDiagnostics() { this("combat"); }
     public CombatDiagnostics(String scenario) { this.scenario = scenario; }
     private static <T> Set<T> identitySet() { return Collections.newSetFromMap(new IdentityHashMap<T, Boolean>()); }
     public void init(CombatEngineAPI engine) {
         this.engine = engine;
         recording = new DiagnosticRecorder(
-            (filename, contents) -> Global.getSettings().writeTextFileToCommon(filename, contents),
-            (operation, filename, error) -> {
-                String message = "KAYN diagnostics " + operation + " failed: " + filename;
-                Global.getLogger(CombatDiagnostics.class).error(message, error);
-                try {
-                    if (engine.getCombatUI() != null) {
-                        engine.getCombatUI().addMessage(0, java.awt.Color.ORANGE, message);
-                    }
-                } catch (RuntimeException notificationError) {
-                    Global.getLogger(CombatDiagnostics.class).warn("KAYN diagnostics could not display recording warning", notificationError);
+            (filename, contents) -> {
+                Global.getSettings().writeTextFileToCommon(filename, contents);
+                // The game may log a failed rename without throwing. Verify completed archives.
+                if(!DiagnosticRecorder.LIVE_FILE.equals(filename) &&
+                        !contents.equals(Global.getSettings().readTextFileFromCommon(filename))) {
+                    throw new java.io.IOException("Archive readback differs after write: "+filename);
                 }
-            });
+            },
+            this::reportFailure);
         engine.getCustomData().put(KEY, this);
     }
     public String snapshot(String slot) {
         if (slot == null || slot.isEmpty()) return snapshot;
-        WeaponDiagnostics row = rows.get(slot);
-        return row == null ? "Unknown or not deployed slot: " + slot : WeaponDiagnostics.HEADER + row.line();
+        String row = publishedRows.get(slot);
+        return row == null ? "Unknown or not deployed slot: " + slot :
+            (observationWarning.isEmpty()?"":"# snapshotStale=true\n") + WeaponDiagnostics.HEADER + row;
     }
     public void processInputPreCoreControls(float amount, List<InputEventAPI> events) {
+        try { processInput(events); }
+        catch (RuntimeException error) { stopAfterFailure("input snapshot", error); }
+    }
+    private void processInput(List<InputEventAPI> events) {
         if(engine==null || combatEnded || engine.isCombatOver() || engine.isUIShowingDialog() || !engine.isUIShowingHUD()) return;
         for(InputEventAPI e:events) {
             if(e.isConsumed() || !e.isKeyDownEvent() || e.isRepeat() || !e.isCtrlDown() || e.isAltDown() || e.isShiftDown()) continue;
             int key=e.getEventValue();
             if(key==org.lwjgl.input.Keyboard.KEY_F8) {
+                e.consume();
                 enabled=!enabled;
                 if(!enabled) { finish("disabled"); hunter=null; pinned=null; targetMode=false; }
-                else { finished=false; stopReason=""; }
-                e.consume();
+                else { finished=false; stopReason=""; recording.retryPendingArchives(); }
             } else if(enabled && key==org.lwjgl.input.Keyboard.KEY_F9) {
+                e.consume();
                 ShipAPI player=engine.getPlayerShip();
                 if(targetMode) { targetMode=false; pinned=null; }
                 else if(player!=null && player.getShipTarget()!=null) { targetMode=true; pinned=player.getShipTarget(); }
-                e.consume();
             } else if(enabled && key==org.lwjgl.input.Keyboard.KEY_F10) {
-                page=(page+1)%Math.max(1,(rows.size()+5)/6); if(hunter!=null) buildSnapshot();e.consume();
+                e.consume();
+                page=(page+1)%Math.max(1,(rows.size()+5)/6); if(hunter!=null) buildSnapshot();
             }
         }
     }
@@ -81,6 +86,9 @@ public class CombatDiagnostics extends BaseEveryFrameCombatPlugin {
         if(hunter!=null) finish("ship changed");
         hunter=ship;finished=false;recording.beginSession();stopReason="";elapsed=refresh=disk=0;page=0;
         session=UUID.randomUUID().toString();rows.clear();weaponRows.clear();
+        publishedRows.clear();
+        observationWarning="";
+        snapshot="# Kayn combat diagnostics v1\n# session="+session+" noCompleteSnapshot=true\n"+WeaponDiagnostics.HEADER;
         Arrays.fill(damage,0);Arrays.fill(unknown,0);detach();
         for(WeaponAPI w:ship.getAllWeapons()) {
             if(w.isDecorative()) continue;
@@ -97,7 +105,8 @@ public class CombatDiagnostics extends BaseEveryFrameCombatPlugin {
         if(hunter==null || finished) return;
         finished=true;stopReason=reason;
         try {
-            buildSnapshot();
+            try { buildSnapshot(); }
+            catch (RuntimeException error) { preserveFailedSnapshot("final snapshot", error); }
             writeSnapshot();
             recording.archive(session, snapshot);
         } finally {
@@ -105,6 +114,13 @@ public class CombatDiagnostics extends BaseEveryFrameCombatPlugin {
         }
     }
     public void advance(float amount, List<InputEventAPI> events) {
+        try {
+            if(engine==null) return;
+            if(!engine.isPaused()) recording.advance(amount);
+            advanceObservation(amount);
+        } catch (RuntimeException error) { stopAfterFailure("observation snapshot", error); }
+    }
+    private void advanceObservation(float amount) {
         if(engine==null || combatEnded) return;
         // Battle completion is terminal, even if the controlled ship changes or collection is off.
         if(engine.isCombatOver()) {combatEnded=true;finish("combat ended");return;}
@@ -125,9 +141,13 @@ public class CombatDiagnostics extends BaseEveryFrameCombatPlugin {
         }
     }
     public void renderInUICoords(ViewportAPI viewport) {
+        try { renderPanel(); }
+        catch (RuntimeException error) { stopAfterFailure("panel", error); }
+    }
+    private void renderPanel() {
         if (!overlay || !enabled || engine == null || !engine.isUIShowingHUD() || engine.isUIShowingDialog()) return;
         if (panel == null) panel = new DiagnosticPanel();
-        panel.draw(hunter==null?"COMBAT DIAGNOSTICS | Waiting for your ship\nCtrl+F8: off":panelHeader+recording.status()+panelRows, engine.isPaused());
+        panel.draw(hunter==null?"COMBAT DIAGNOSTICS | Waiting for your ship\n"+observationWarning+"Ctrl+F8: off":panelHeader+observationWarning+recording.status()+panelRows, engine.isPaused());
     }
     private WeaponDiagnostics rowFor(WeaponAPI weapon) {
         return weaponRows.get(weapon);
@@ -156,9 +176,10 @@ public class CombatDiagnostics extends BaseEveryFrameCombatPlugin {
         }
         for (ShipAPI ship : engine.getShips()) {
             if (listeners.containsKey(ship)) continue;
+            String observedSession = session;
             DamageListener listener = new DamageListener() {
                 public void reportDamageApplied(Object source, CombatEntityAPI target, ApplyDamageResultAPI result) {
-                    if (finished || result == null) return;
+                    if (finished || !observedSession.equals(session) || result == null) return;
                     WeaponAPI weapon = null;
                     ShipAPI responsible = source instanceof ShipAPI ? (ShipAPI) source : null;
                     if (source instanceof DamagingProjectileAPI) {
@@ -179,12 +200,44 @@ public class CombatDiagnostics extends BaseEveryFrameCombatPlugin {
         }
     }
     private void detach() {
-        for (Map.Entry<ShipAPI, DamageListener> e : listeners.entrySet()) e.getKey().removeListener(e.getValue());
+        for (Map.Entry<ShipAPI, DamageListener> e : listeners.entrySet()) {
+            try { e.getKey().removeListener(e.getValue()); }
+            catch (RuntimeException error) { reportFailure("listener cleanup", "combat listener", error); }
+        }
         listeners.clear(); previous.clear(); hitSeen.clear();
+    }
+    private void preserveFailedSnapshot(String operation, RuntimeException error) {
+        observationWarning="Observation: FAILED; last complete data is stale\n";
+        snapshot="# snapshotStale=true measurementStopped=true; following data is last complete snapshot\n"+snapshot;
+        reportFailure(operation, "session "+session, error);
+    }
+    private void stopAfterFailure(String operation, RuntimeException error) {
+        enabled=false;
+        try {
+            if(hunter!=null && !finished) {
+                finished=true;
+                preserveFailedSnapshot(operation, error);
+                recording.archive(session, snapshot);
+            } else if(observationWarning.isEmpty()) {
+                observationWarning="Observation: FAILED; restart diagnostics to retry\n";
+                reportFailure(operation, "session "+session, error);
+            }
+        } finally {
+            detach();hunter=null;pinned=null;targetMode=false;
+        }
+    }
+    private void reportFailure(String operation, String filename, Exception error) {
+        String message="KAYN diagnostics "+operation+" failed: "+filename;
+        try { Global.getLogger(CombatDiagnostics.class).error(message,error); }
+        catch (RuntimeException ignored) { /* Keep the observer boundary safe if logging is unavailable. */ }
+        try {
+            if(engine!=null && engine.getCombatUI()!=null) engine.getCombatUI().addMessage(0,java.awt.Color.ORANGE,message);
+        } catch (RuntimeException ignored) { /* File/observation status remains available without the combat UI. */ }
     }
     private static String n(float value) { return Float.isFinite(value) ? String.format(Locale.ROOT, "%.2f", value) : "NA"; }
     private static String safe(String value) { return value == null ? "NA" : value.replace('\t',' ').replace('\n',' '); }
-    private void buildSnapshot() {
+    /** Override in controlled verification subclasses to test failure containment without reflection. */
+    protected void buildSnapshot() {
         StringBuilder out = new StringBuilder("# Kayn combat diagnostics v1\n# session=" + session + " scenario=" + scenario
             + " ship=" + safe(hunter.getId()) + " hull=" + safe(hunter.getHullSpec().getHullId()) + " reason=" + stopReason.replace(' ','_') + " seconds=" + n(elapsed) + " ended=" + finished + " capturedUtc=" + java.time.Instant.now() + "\n");
         out.append("# totals shield/armor/hull/EMP=").append(Arrays.toString(damage))
@@ -194,11 +247,12 @@ public class CombatDiagnostics extends BaseEveryFrameCombatPlugin {
            .append(hunter.getFluxTracker().isVenting()).append('\n');
         out.append("# State labels describe observations, not proven reasons. Range uses collision radius; firing line is instantaneous geometry, not AI permission or missile trajectory.\n");
         out.append(WeaponDiagnostics.HEADER);
+        Map<String,String> nextRows = new HashMap<>();
         for (WeaponDiagnostics row : rows.values()) {
             row.refresh(hunter, engine);
             out.append(row.line());
         }
-        snapshot = out.toString();
+        for (Map.Entry<String,WeaponDiagnostics> entry : rows.entrySet()) nextRows.put(entry.getKey(),entry.getValue().line());
         StringBuilder hud = new StringBuilder("COMBAT DIAGNOSTICS | "+(finished?"FINAL":"LIVE")+" | "+Math.round(elapsed)+"s\n");
         hud.append(shortText(hunter.getHullSpec().getHullName(),34)).append(targetMode?" [TARGET]":" [YOUR SHIP]").append('\n');
         hud.append("Hull ").append(Math.round(hunter.getHitpoints())).append("  Flux ").append(Math.round(hunter.getFluxTracker().getCurrFlux())).append(" / ").append(Math.round(hunter.getFluxTracker().getMaxFlux())).append('\n');
@@ -206,13 +260,17 @@ public class CombatDiagnostics extends BaseEveryFrameCombatPlugin {
         hud.append("Ctrl+F8 on/off | F9 target/self | F10 page\n");
         int pages=Math.max(1,(rows.size()+5)/6);page=Math.min(page,pages-1);
         hud.append("Weapons ").append(rows.size()).append(" | page ").append(page+1).append('/').append(pages).append(" (all keys use Ctrl)\n");
-        panelHeader = hud.toString();
+        String nextHeader = hud.toString();
         hud = new StringBuilder("\n");
         int index=0;
         for(WeaponDiagnostics row:rows.values()) {
             int i=index++;
             if(i>=page*6&&i<(page+1)*6)row.appendPanel(hud);
         }
+        // Publish the readout only after both TSV and HUD construction succeeded.
+        snapshot = out.toString();
+        publishedRows.clear();publishedRows.putAll(nextRows);
+        panelHeader = nextHeader;
         panelRows = hud.toString();
     }
     private static String shortText(String text,int max) {String s=safe(text);return s.length()>max?s.substring(0,max-1)+"~":s;}

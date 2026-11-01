@@ -14,10 +14,10 @@ final class WeaponDiagnostics {
     // Retained for file compatibility; weapon damage attribution is outside this module's purpose.
     private final double[] damage = new double[4];
     private String line = "", state = "WAITING", rangeStatus = "-";
-    private String displayName = "", mode = "UNGROUPED", aiRequest = "-";
+    private String displayName = "", mode = "UNGROUPED";
     private String targetLabel = "UNKNOWN";
     private int groupNumber;
-    private boolean ready, firing, venting, observedTarget;
+    private boolean firing, venting, observedTarget;
     private FiringLine.Result fireLine = new FiringLine.Result("NO_TARGET", "-");
 
     WeaponDiagnostics(String slot, WeaponAPI weapon) { this.slot=slot; this.weapon=weapon; }
@@ -30,29 +30,14 @@ final class WeaponDiagnostics {
 
     void refresh(ShipAPI hunter, CombatEngineAPI engine) {
         WeaponAPI w=weapon;
-        WeaponGroupAPI group = hunter.getWeaponGroupFor(w);
-        boolean activeAutofire = group != null && group.isAutofiring() && group != hunter.getSelectedGroupAPI();
-        AutofireAIPlugin ai = activeAutofire ? group.getAutofirePlugin(w) : null;
-        CombatEntityAPI target = ai == null ? null : ai.getTargetShip();
-        if (target == null && ai != null) target = ai.getTargetMissile();
-        Vector2f point = ai == null ? null : ai.getTarget();
-        String targetSource = point == null ? (ai==null?"UNOBSERVED":"NONE") : "AUTOFIRE_AI";
-        if (point == null && target != null) { point = target.getLocation(); targetSource = "AI_ENTITY_CENTRE"; }
-        boolean hasAiTarget = point != null;
-        if(point==null && group!=null && group==hunter.getSelectedGroupAPI()
-                && (hunter.getShipAI()!=null || hunter==engine.getPlayerShip()&&engine.isUIAutopilotOn())
-                && hunter.getShipTarget()!=null) {
-            target=hunter.getShipTarget();point=hunter.getMouseTarget();
-            if(point==null)point=target.getLocation();
-            targetSource="SHIP_AI_SELECTED_TARGET";
-        }
-        boolean beamContact = false;
-        if (w.isBeam()) for (BeamAPI beam : engine.getBeams()) {
-            if (beam.getWeapon()==w && beam.didDamageThisFrame() && beam.getDamageTarget()!=null) {
-                target=beam.getDamageTarget();point=beam.getTo();targetSource="BEAM_CONTACT";beamContact=true;break;
-            }
-        }
-        targetLabel = target instanceof MissileAPI?"MISSILE":target instanceof DamagingProjectileAPI?"PROJECTILE":target instanceof ShipAPI?"SHIP":point!=null?"POINT":ai==null?"UNKNOWN":"NONE";
+        WeaponTarget evidence = WeaponTarget.observe(w, hunter, engine);
+        WeaponGroupAPI group = evidence.group();
+        AutofireAIPlugin ai = evidence.ai();
+        CombatEntityAPI target = evidence.entity();
+        Vector2f point = evidence.point();
+        String targetSource = evidence.source();
+        boolean beamContact = evidence.beamContact();
+        targetLabel = evidence.label();
         observedTarget = point!=null;
         fireLine = point==null ? new FiringLine.Result("UNKNOWN","-") : FiringLine.trace(w, target, point, engine);
         // Entity range is a collision-radius approximation; beam contact uses the actual contact point.
@@ -63,7 +48,7 @@ final class WeaponDiagnostics {
         boolean disabled = w.isDisabled() || w.isForceDisabled();
         venting = hunter.getFluxTracker().isVenting();
         boolean blocked = hunter.getFluxTracker().isOverloaded() || venting;
-        boolean wants = ai != null && ai.shouldFire();
+        boolean wants = evidence.wantsFire();
         boolean rangeMet = DiagnosticMath.inRange(surface, w.getRange());
         rangeStatus = point == null ? "UNKNOWN" : rangeMet ? "MET" : "OUT";
         firing = w.isFiring() || beamContact;
@@ -73,46 +58,64 @@ final class WeaponDiagnostics {
         float cooldown = w.getCooldownRemaining();
         float fluxCost = w.getFluxCostToFire();
         float headroom = hunter.getFluxTracker().getMaxFlux()-hunter.getFluxTracker().getCurrFlux();
-        ready = DiagnosticMath.ready(hasAiTarget,rangeMet,arc,disabled,blocked,forcedOff,
-            cooldown,ammo,fluxCost,headroom);
-        state = DiagnosticMath.state(firing,disabled,blocked,hasAiTarget,rangeMet,arc,wants);
-        if(!firing && !disabled && !blocked && point!=null && !hasAiTarget)
-            state=!rangeMet?"OUT_OF_RANGE":!arc?"OUT_OF_ARC":"TARGET_OBSERVED";
-        if(!firing && !disabled && !blocked && point==null && ai==null)state="TARGET_UNKNOWN";
-        if (!firing && !disabled && !blocked) {
-            if (forcedOff) state="FORCED_NO_FIRE";
-            else if (usesAmmo && ammo<=0) state="NO_AMMO";
-            else if (cooldown>0) state="COOLDOWN";
-            else if (fluxCost>headroom) state="FLUX_HEADROOM_LOW";
-        }
+        WeaponReadiness readiness = new WeaponReadiness(disabled, blocked, forcedOff,
+            ammo, cooldown, fluxCost, headroom);
+        boolean ready = readiness.ready(evidence, rangeMet, arc);
+        state = readiness.state(evidence, firing, rangeMet, arc);
         displayName = w.getDisplayName();
         groupNumber = group==null ? 0 : hunter.getWeaponGroupsCopy().indexOf(group)+1;
         mode = controlMode(hunter, group);
-        aiRequest = ai==null?"-":wants?"YES":"NO";
-        line = slot+"\t"+safe(w.getSpec().getWeaponId())+"\t"+state+"\t"+firing+"\t"+n(firingSeconds)
-            +"\t"+projectiles+"\t"+impacts+"\t"+beamFrames+"\t"+(ai==null?"NA":wants)
-            +"\t"+(group!=null&&group.isAutofiring())+"\t"+(group!=null&&group==hunter.getSelectedGroupAPI())
-            +"\t"+targetSource+"\t"+(target==null?"NA":safe(target instanceof ShipAPI ? ((ShipAPI)target).getId() : target instanceof MissileAPI?"MISSILE":target instanceof DamagingProjectileAPI?"PROJECTILE":"ENTITY"))
-            +"\t"+n(centre)+"\t"+n(surface)+"\t"+n(w.getRange())+"\t"+(point==null?"NA":arc)
-            +"\t"+n(cooldown)+"\t"+(usesAmmo?ammo:"unlimited")+"\t"+disabled+"\t"+forcedOff
-            +"\t"+damage[0]+"\t"+damage[1]+"\t"+damage[2]+"\t"+damage[3]+"\t"+rangeStatus+"\t"+ready+"\t"+fireLine.status()+"\t"+safe(fireLine.blocker())+"\t"+mode+"\t"+groupNumber+"\n";
+        line = String.join("\t",
+            slot, safe(w.getSpec().getWeaponId()), state, text(firing), n(firingSeconds),
+            text(projectiles), text(impacts), text(beamFrames), ai == null ? "NA" : text(wants),
+            text(group != null && group.isAutofiring()), text(group != null && group == hunter.getSelectedGroupAPI()),
+            targetSource, safe(evidence.id()), n(centre), n(surface), n(w.getRange()),
+            point == null ? "NA" : text(arc), n(cooldown), usesAmmo ? text(ammo) : "unlimited",
+            text(disabled), text(forcedOff), text(damage[0]), text(damage[1]), text(damage[2]), text(damage[3]),
+            rangeStatus, text(ready), fireLine.status(), safe(fireLine.blocker()), mode, text(groupNumber)) + "\n";
     }
 
     void appendPanel(StringBuilder hud) {
-        String mark=fireLine.blocked()?"!":venting&&!firing?"^":observedTarget&&"OUT".equals(rangeStatus)?"~":"";
-        hud.append(mark).append(shortText(slot,14)).append(" ").append(shortText(displayName,25)).append(" G").append(groupNumber).append('\n');
-        hud.append(mark).append(observedTarget?"TARGET "+targetLabel:"NO_TARGET");
-        String activity = firing?"FIRING":state.equals("NO_TARGET")||state.equals("TARGET_UNKNOWN")?"IDLE":state;
-        hud.append(" | ").append(activity).append(" | ").append(mode).append('\n');
-        hud.append(mark).append("Range ").append("UNKNOWN".equals(rangeStatus)?"?":rangeStatus).append(" | Line ").append("UNKNOWN".equals(fireLine.status())?"?":fireLine.status()).append(" | ");
-        if(weapon.isBeam())hud.append("Beam ").append(n(firingSeconds)).append("s | Hit frames ").append(beamFrames);
-        else hud.append("Shots/hits ").append(projectiles).append('/').append(impacts);
+        String mark = colorMarker();
+        hud.append(mark).append(shortText(slot, 14)).append(" ")
+            .append(shortText(displayName, 25)).append(" G").append(groupNumber).append('\n');
+        hud.append(mark).append(observedTarget ? "TARGET " + targetLabel : "NO_TARGET")
+            .append(" | ").append(activity()).append(" | ").append(mode).append('\n');
+        hud.append(mark).append("Range ").append(unknownAsQuestion(rangeStatus))
+            .append(" | Line ").append(unknownAsQuestion(fireLine.status())).append(" | ");
+        if (weapon.isBeam()) {
+            hud.append("Beam ").append(n(firingSeconds)).append("s | Hit frames ").append(beamFrames);
+        } else {
+            hud.append("Shots/hits ").append(projectiles).append('/').append(impacts);
+        }
         hud.append('\n');
     }
 
-    private static String controlMode(ShipAPI hunter, WeaponGroupAPI group) {
-        return group==null?"UNGROUPED":group==hunter.getSelectedGroupAPI()?"SELECTED":group.isAutofiring()?"AUTO":"MANUAL";
+    private String colorMarker() {
+        if (fireLine.blocked()) return "!";
+        if (venting && !firing) return "^";
+        if (observedTarget && "OUT".equals(rangeStatus)) return "~";
+        return "";
     }
+
+    private String activity() {
+        if (firing) return "FIRING";
+        if ("NO_TARGET".equals(state) || "TARGET_UNKNOWN".equals(state)) return "IDLE";
+        return state;
+    }
+
+    private static String unknownAsQuestion(String value) {
+        return "UNKNOWN".equals(value) ? "?" : value;
+    }
+
+    private static String text(Object value) { return String.valueOf(value); }
+
+    private static String controlMode(ShipAPI ship, WeaponGroupAPI group) {
+        if (group == null) return "UNGROUPED";
+        if (group == ship.getSelectedGroupAPI()) return "SELECTED";
+        return group.isAutofiring() ? "AUTO" : "MANUAL";
+    }
+
     private static String n(float value) { return Float.isFinite(value)?String.format(Locale.ROOT,"%.2f",value):"NA"; }
     private static String safe(String value) { return value==null?"NA":value.replace('\t',' ').replace('\n',' '); }
     private static String shortText(String text,int max) { String s=safe(text);return s.length()>max?s.substring(0,max-1)+"~":s; }

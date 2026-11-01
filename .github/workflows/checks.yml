@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   java:
-    name: Java 17 math and state
+    name: Java 17 math, state and archive queue
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

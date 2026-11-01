@@ -1,3 +1,39 @@
+## Unreleased hardening verification (2026-11-01, local candidate)
+
+This working revision is newer than published 1.3.0. Production Java was changed;
+the game installation and GitHub release assets were not changed. No new game
+session or hosted GitHub check was run for this candidate.
+
+All seven local test programs passed 222 assertions with JDK 27 targeting Java 17:
+19 math/state, 23 archive queue, 7 line geometry, 17 obstruction/API,
+24 lifecycle, 41 recording reliability and 89 weapon diagnostics. Failure logs
+are deliberate injected exceptions. The original escaping snapshot exception
+was reproduced before containment and is preserved in the local audit evidence.
+
+Target provenance and readiness priority now have separate owners. A differential
+harness compared this implementation with committed 1.3.0 production code across
+20 scenarios: TSV values and HUD text matched byte for byte. This is behavioral
+characterization, not exhaustive compatibility or a performance measurement.
+
+Snapshot failures at initial collection, refresh, pagination, finalization and
+HUD construction are contained. Fallback reports identify stale/incomplete data;
+publication waits for complete TSV and HUD construction. A real temporary disk
+file confirmed automatic recovery of the exact queued report after an injected
+write failure. Fixtures also verify paused/off/post-combat retry behavior,
+re-enable recovery, bounded size/attempts, fairness, notification failure,
+persistent overflow warnings and exhausted entries. A failed host listener
+removal is contained; old-session callbacks cannot affect a new measurement.
+
+The two-build packaging regression passed after the refactor. The dependency-free
+command passed 42 assertions locally. Queue memory is bounded to eight reports
+and 524,288 UTF-16 characters of text; retries are one write per five unpaused
+simulation seconds. The queue is combat-local and not durable across plugin
+disposal or game exit. Five attempts are allowed initially; explicit re-enable
+grants exhausted entries another five attempts. Fatal JVM Errors are not caught.
+Synchronous file-write latency and live gameplay remain unmeasured/unverified.
+
+The following sections describe earlier revisions and their original limits.
+
 ## v1.3.0 release-package preparation (2026-11-01, local review)
 
 README now states that the individual AI firing request is in TSV `aiShouldFire`,
@@ -96,3 +132,12 @@ All 47 automated assertions passed: 19 geometry/state, 7 segment/circle geometry
 Real-game checks: with the Verdant prototype disabled, a vanilla Lasher was detected with seven weapons; weapon paging, live firing/damage, paused target switching to a six-weapon pirate Mule, disable and re-enable were verified. The saved snapshot stopped changing while disabled. With Verdant restored, its 23 mounts were discovered and its embedded panel was suppressed by prototype 0.3.5.
 
 Automatic control transfer and combat-end cleanup were tested with API fixtures, not a real campaign. No campaign save was opened or modified. Modular hulls, unusual weapon scripts, other resolutions and mod key conflicts have not been exhaustively tested. Red obstruction rendering still needs a controlled real-game obstruction test; geometric transition tests passed. No performance improvement is claimed.
+
+
+## Live hardening verification, 2026-11-01
+
+Tested the candidate on Starsector 0.98a-RC8 / Java 28-beta via Miko_Rouge, using a temporary multi-ship mission and test-only snapshot override. Verdant, Lasher and Hammerhead identity, weapon inventory and counter reset checks passed across repeated transfers. An injected snapshot exception stopped observation, detached listeners, preserved the last complete report with a stale marker, and allowed a fresh session.
+
+A locked archive destination exposed that the game can log write/rename failures without throwing. Completed archives now require exact readback before acknowledgement. After unlocking and resuming simulation, the automatic retry recovered the original 4,543-byte report exactly despite a ship change. The final Hammerhead archive also matched its completed live report exactly. The final combat interval contained four expected injected error headers and no unexpected warning/error headers. Earlier setup/launcher errors are outside that interval.
+
+The temporary helper had two premature failure assertions after reading the empty locked-file placeholder at 0.51 simulation seconds. Independent file comparison after further unpaused simulation established successful recovery; those helper assertions are retained as a test-harness limitation, not hidden. This does not establish an exact live five-second timing measurement or broad performance/gameplay compatibility. The local suite passes 222 assertions, including a regression for silent archive write failure. The queue is bounded and in memory; exhausted reports require explicit rearming, and process exit loses pending reports.

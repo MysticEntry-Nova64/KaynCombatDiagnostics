@@ -31,7 +31,7 @@ public class DiagnosticsIntegrationTest {
  static com.fs.starfarer.api.input.InputEventAPI event(int k){key=k;consumed=false;return fake(com.fs.starfarer.api.input.InputEventAPI.class,(n,a)->switch(n){case "isKeyDownEvent","isCtrlDown"->true;case "getEventValue"->key;case "isConsumed"->consumed;case "consume"->{consumed=true;yield null;}default->null;});}
  static void press(CombatDiagnostics d,int k){d.processInputPreCoreControls(0,List.of(event(k)));}
  public static void main(String[] args) {
-  Global.setSettings(fake(SettingsAPI.class,(n,a)->{if(n.equals("writeTextFileToCommon")){writes++;file=(String)a[1];}return null;}));
+  Global.setSettings(fake(SettingsAPI.class,(n,a)->{if(n.equals("writeTextFileToCommon")){writes++;file=(String)a[1];}if(n.equals("readTextFileFromCommon"))return file;return null;}));
   ShipHullSpecAPI hull=fake(ShipHullSpecAPI.class,(n,a)->switch(n){case "getHullId"->"ordinary_ship";case "getHullName"->"Ordinary ship";default->null;});
   FluxTrackerAPI flux=fake(FluxTrackerAPI.class,(n,a)->n.equals("getMaxFlux")?1000f:null);
   List<WeaponAPI> weapons=new ArrayList<>();

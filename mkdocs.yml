@@ -22,4 +22,5 @@ nav:
   - Overview: index.md
   - Build and installation: build.md
   - Verification evidence: verification.md
+  - Reliability patterns: reliability-patterns.md
   - Documentation workflow: documentation.md

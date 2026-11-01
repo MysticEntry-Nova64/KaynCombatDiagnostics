@@ -17,7 +17,7 @@ $tests=Get-ChildItem "$PSScriptRoot/tests" -Filter '*.java' | ForEach-Object Ful
 if($LASTEXITCODE -ne 0){throw 'Production compilation failed'}
 & "$JdkRoot/bin/javac.exe" --release 17 -cp "$prod;$diagClasspath" -d $test $tests
 if($LASTEXITCODE -ne 0){throw 'Test compilation failed'}
-foreach($name in @('DiagnosticMathTest','FiringLineTest','FiringLineIntegrationTest','DiagnosticsIntegrationTest','RecordingReliabilityTest','WeaponDiagnosticsTest')){
+foreach($name in @('DiagnosticMathTest','ArchiveQueueTest','FiringLineTest','FiringLineIntegrationTest','DiagnosticsIntegrationTest','RecordingReliabilityTest','WeaponDiagnosticsTest')){
  & "$JdkRoot/bin/java.exe" -cp "$test;$prod;$diagClasspath" "kayn.diagnostics.$name"
  if($LASTEXITCODE -ne 0){throw "Failed: $name"}
 }

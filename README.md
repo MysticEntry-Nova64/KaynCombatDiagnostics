@@ -1,4 +1,6 @@
-# Kayn Combat Diagnostics 1.3.0
+# Kayn Combat Diagnostics 1.3.1
+
+Version 1.3.1 adds snapshot exception containment, verified archive writes and bounded automatic retries. The original 1.3.0 release remains available.
 
 Standalone, optional Starsector 0.98a-RC8 combat observer. Requires LazyLib; does not require Verdant, Console Commands, a hullmod, ship IDs or per-ship setup. Enable the mod in the launcher once.
 
@@ -16,9 +18,13 @@ Known observations take priority over an apparent ready state: `COOLDOWN`, `FORC
 
 Targets come from an active, unselected autofire group, an AI-controlled selected group (including player autopilot) with an explicit ship-AI target and aim point, or a beam currently applying damage. The nearest enemy and a manually selected ship target are never substituted as weapon intent. Ship-AI-selected intent is distinguished as SHIP_AI_SELECTED_TARGET in the TSV; it is not a guarantee that every weapon in that group can fire. The HUD separates TARGET/NO_TARGET from firing activity. The TSV retains NONE/NO_TARGET when an active autofire plugin reports no target, and UNOBSERVED/TARGET_UNKNOWN when weapon intent is unavailable (including manual control). Actual firing remains FIRING even without target evidence. A live beam contact can establish FIRING and its contact target independently of autofire. Range uses the observed contact point, or a collision-radius approximation for an autofire entity; it is not a guarantee of projectile reach. `AI_HOLD` describes the individual autofire request. `READY_OBSERVED` means the measured readiness checks passed; it does not promise that the weapon will fire or hit.
 
-Recording status is visible in the panel. A failed live-file write is reported once and stops further live-file attempts for that measurement; collection and the in-memory readout continue. Finishing still attempts a separate archive. Any archive failure is logged with its filename and reported through the combat message area, even when disabling hides the overlay. Starting a fresh measurement retries live recording; a previous archive warning stays visible until an archive succeeds. Failed archives are not queued or automatically retried: the current in-memory snapshot remains available until another measurement replaces it.
+Recording status is visible in the panel. A failed live-file write is reported once and stops further live-file attempts for that measurement; collection and the in-memory readout continue. Finishing attempts a separate archive even after live-file failure. Archive failures identify their filename in the log and combat message area. The queue retains the exact failed report across subject changes and retries one report every five unpaused simulation seconds, including while diagnostics are disabled and after battle completion if the engine still advances this plugin. Successful writes remove only that report; other unresolved failures keep the warning visible.
 
-No steering, weapon or stat changes. Collection pauses with combat. Disabling detaches listeners, stops scans/writes and hides the panel. Battle end or subject loss finalizes the measurement. Returning directly out of combat before another plugin update is not guaranteed to produce a final archive; the most recent live snapshot remains.
+The queue holds at most eight reports and 524,288 UTF-16 characters in total (up to 1 MiB of character payload, plus bounded entry overhead). Each report gets its initial write and four automatic retries. Exhausted reports remain in memory; explicitly enabling diagnostics with Ctrl+F8 grants exhausted entries another five retry attempts. Queue overflow or an oversized failed report is reported explicitly and does not evict older reports. An unqueued-loss warning remains for the rest of combat. This is an in-memory combat-local queue: pending reports do not survive the plugin being discarded or the game closing.
+
+Snapshot/readout and observation runtime exceptions stop that measurement, report the failure, detach listeners on a best-effort basis and archive the last complete report with an explicit snapshotStale marker. TSV, per-slot readouts and HUD construction publish only after a complete snapshot succeeds. If the first snapshot fails, the fallback explicitly says noCompleteSnapshot instead of reusing another ship's report. Ctrl+F8 can start a fresh measurement. Runtime exceptions from diagnostic input and rendering are also contained; fatal JVM Errors are not swallowed. A broken host listener-removal API cannot be forced to remove a listener, but cleanup still attempts the remaining removals.
+
+No steering, weapon or stat changes. Collection and retry timing pause with combat. Disabling stops scans and live writes and hides the panel; pending archives may still retry. Battle end or subject loss finalizes the measurement. Returning directly out of combat before another plugin update is not guaranteed to produce a final archive; the most recent live snapshot remains.
 
 Automatic local files in Starsector/saves/common:
 - kayn_combat_diagnostics_live.tsv.data: latest snapshot, approximately once per simulation second.
@@ -37,10 +43,10 @@ Java source and test source included. Build instructions and actual test evidenc
 For a binary release, extract the `KaynCombatDiagnostics` folder from the release ZIP
 into `Starsector/mods`, install LazyLib separately, then enable the mod in the launcher.
 The GitHub source download needs a local build first. See BUILD.md for building and
-packaging, and RELEASE-NOTES.md for the 1.3.0 release summary.
+packaging, and RELEASE-NOTES.md for the 1.3.1 release summary.
 
-GitHub checks validate documentation and the 19 dependency-free math/state assertions.
-The full 178-assertion suite and binary packaging require a local Starsector installation.
+GitHub checks validate documentation and 42 dependency-free math/state and archive-queue assertions.
+The full 222-assertion suite and binary packaging require a local Starsector installation.
 
 ## License
 
