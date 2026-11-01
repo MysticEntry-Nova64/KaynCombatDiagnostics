@@ -1,3 +1,170 @@
+## 1.5.0 audit and verification — 1 November 2026
+
+Ten local programs report **333 passing assertions**, zero failed assertions:
+19 math/state, 23 archive queue, 8 geometry, 17 geometry/API, 32 lifecycle,
+44 recording reliability, 109 weapon diagnostics, 51 weapon evidence,
+22 font/layout/key checks and 8 portable font checks. JDK27.0.1 targets Java17.
+Portable checks pass 50; expected injected failures in recording tests are
+distinct from live game errors. Build-output regression checks deleted/test
+classes cannot leak into runtime packaging and unrelated build files survive.
+
+### Code and dependency boundaries
+
+- Production JAR contains only `kayn.diagnostics` classes. No external mod/library
+  dependency in metadata or build classpath. Jdeps resolves Java, Starsector API,
+  and the game's bundled Log4j/LWJGL only; LazyLib is no longer referenced.
+- Font parser, board layout, shortcuts, freshness, restrictions, geometry,
+  shot history and recording have separate modules. Game integration remains an
+  opt-in observer. Tests reject combat API setter/force/spawn/command calls.
+- Source review found no steering, targeting, damage, weapon/stat mutators,
+  game-class overrides or original data/model changes. The observer registers
+  its own listeners/plugin/custom-data key, writes its own files, consumes only
+  configured Ctrl shortcuts, and saves/restores drawing state.
+- SHA256 comparison found all 21 original core JARs unchanged. Other mods were
+  not edited. Original enabled_mods.json was restored byte for byte; the temporary
+  verification mod was moved outside the game after testing.
+
+### Real game checks
+
+Launched through Miko_Rouge.bat and verified the Java28 executable. Starsector
+0.98a-RC8 with the user's existing enabled mod stack, including Fast Rendering.
+Normal tactical UI transferred Hammerhead → Sunder → Wolf, with command shuttle
+sessions in between. The observer followed automatically and reset counters;
+separate subject archives were read back. Target mode pinned a selected
+Dominator and returned to the controlled Hammerhead. No-target toggle remained
+on the controlled ship. Tested pages, help open/close, scrolling shortcuts,
+paused evidence, disable/re-enable, ship loss and combat completion. Explicit
+stop produced an ended=true/reason=disabled archive; combat-end Wolf archive
+contains reason=combat_ended. Snapshot readback verification is enabled in code.
+
+Fresh native screenshots show the rounded teal board, readable independent
+colours, conditional pages, firing activity, projectile/impact counters, initial
+green-to-dark shot vectors, beam time/contact counters and freshness. Live
+restrictions observed include Distance, Arc, NoTarget, Cooldown, NoAmmo, Damaged
+and Fluxing. Deterministic fixture tests cover every restriction and combinations,
+geometry guards, five-entry eviction/shades, target provenance and failure paths.
+
+Final fresh-process combat interval: **0 ERROR / 0 WARN**. Entire final startup:
+32 ERROR / 8 WARN from the existing mod stack; no diagnostic errors. This does
+not certify the whole installation as error-free or those other errors as harmless.
+
+### Failures found and corrected before release
+
+Large finite geometry could overflow float intermediates and falsely miss a
+circle intersection; a failing regression passed after double intermediates.
+Fast Rendering rejected glClientActiveTexture; removed that unnecessary call
+for immediate-mode drawing. Atlas loading required loadTexture before getSprite,
+and BMFont top-origin coordinates required conversion to the game's bottom-origin
+texture coordinates. Fresh-process visual reruns verified the final rendering.
+The first media helper used reflection proxies rejected by the game's script
+security boundary. Replaced it with plain labelled display examples; no security
+settings were bypassed. It is test-only and excluded from the runtime package.
+
+### Media and limits
+
+24 animated GIFs were encoded from fresh complete native screenshots, reopened
+to verify frame counts, and visually checked through contact sheets/keyframes.
+Six live clips cover metrics, firing/impacts, vectors, subjects, page/help/pause,
+and target pinning. Eighteen display illustrations cover all 12 restriction
+labels, combinations, beam/projectile counters, freshness, recording warning
+and help. They are explicitly labelled illustrations, not live measurements;
+their example counters are deliberately artificial. See the media gallery.
+
+No exhaustive compatibility guarantee, performance improvement, high-DPI/window
+matrix coverage, trigger-pull counting or validated per-weapon damage/accuracy
+metric is claimed. Black/overlapping/offscreen lines may be hard to see. Game
+target labels drawn later can overlap the board. Rare disk failures and FAILED/
+STALE states are deterministic fixture checks, not forced failures in a campaign.
+Pending archive retries remain combat-local memory, not a durable spool.
+
+Canonical local evidence: `outputs/audit-release/` in the planning workspace:
+build/portable/package logs, dependency reports, native screenshots and freshness
+sidecars, copied archives, log-summary, media source manifests and GIFs.
+
+## 1.4.1 compact HUD — 1 November 2026
+
+Eight local programs passed 302 reported assertions with zero failed assertions:
+19 math/state,23 archive queue,7 geometry,17 geometry/API,32 lifecycle,
+44 recording reliability,109 weapon diagnostics,51 evidence/HUD checks.
+Build uses JDK27.0.1 targeting Java17 and installed game/LazyLib APIs.
+Expected injected ERROR logs remain in the recording failure-path tests.
+Portable checks passed42. The HUD-specific checks exercise conditional page
+display, grouped metrics, concise recording/failure state, one NoTarget label,
+help toggle and independent pause status in the actual HUD composition.
+
+Live candidate: Miko_Rouge.bat, verified Java28 process18188, standalone
+A Fistful of Credits with the user's enabled mods. Opened fresh native captures
+show compact title/timer/Recording, Lasher Page1/2 then Page2/2, help open/closed,
+PAUSED status, selected six-weapon Mule with no Page1/1, one grey NoTarget,
+and independent red NoAmmo/Damaged, amber Arc and purple AIHold observations.
+Normal game autopilot produced projectile activity; diagnostics remained read-only.
+
+Log scope: the latest launcher banner starts at original line228020. This run
+has32 startup ERROR and8 WARN headers from other mods; all32 error messages also
+occur in the previous run. No diagnostics errors. From combat start182923ms
+through the recorded test, there are0 ERROR,0 WARN and0 FATAL headers. Old appended
+runs contain historical injected errors and were excluded from current-run counts.
+
+Verification limit: the final Ctrl+F8 archive input was blocked after user input
+was detected. The test process was then stopped before archive confirmation;
+that automation step did not pass and the current exit archive is unverified.
+Live reports and screenshots remain available. This is not a passing exit-archive
+test; existing automated archive tests did pass. Broad mod/window/scaling and
+performance compatibility remains unverified.
+
+Evidence: C:/Users/Minsu/Documents/Codex/2026-11-01/kayn-diagnostics-planning/outputs/compact-hud/.
+Fresh selected-ship capture:live-check/snapshot-20261101-111851-858-7de18f7e.png.
+Help/page2 capture:live-check/snapshot-20261101-111459-158-86ddef9d.png.
+Prior verification below retains its original version/date and limits.
+
+## 1.4.0 weapon evidence — 1 November 2026
+
+Implemented from clean v1.3.1 commit 29bd38e on local branch
+feature/weapon-evidence-vectors. No remote publication.
+
+Eight local test programs pass 291 reported assertions on JDK 27.0.1, compiling
+with --release 17 against installed Starsector 0.98a-RC8 and LazyLib APIs:
+19 math/state, 23 archive queue, 7 geometry, 17 geometry/API transitions,
+28 lifecycle, 43 recording reliability, 110 weapon diagnostics, 44 new evidence.
+Injected ERROR stack traces in recording tests are expected failure-path checks.
+Portable checks pass 42 assertions. Two-build packaging regression passes.
+
+New checks exercise simultaneous independent restrictions/colour spans, five-line
+eviction and monotonic colour darkening, detached coordinates and immutable
+history, independent weapons, projectile spawn-versus-current location, duplicate
+observation, pause/session reset, invalid muzzle/aim/range, collinear overlap,
+endpoint contact, and freshness/fixed-footer status. Existing provenance,
+snapshot publication, cleanup and archive retry checks remain in the full suite.
+
+Live smoke test used Miko_Rouge.bat and verified Java executable
+Starsector/jdk-28+13/bin/java.exe, PID 15688 for the corrected renderer run.
+The vanilla A Fistful of Credits mission ran with the user's enabled mod set;
+this was not a vanilla-only installation. Observed Lasher collection, normal
+game autopilot firing, projectile counters, initial-direction history rendering,
+PAUSED / STALE with cached FIRING, selected Mule observation and return to self.
+Mule HUD showed orange Blocked and blue Cooldown together; NoTarget was grey.
+Fresh native game screenshots were opened, not inferred from timestamps.
+
+First live candidate rendered coloured labels white and showed a font artifact.
+Using individual single-colour text draws and preserving client GL state corrected
+the observed display in a fresh process. Mixed-colour font buffers were the
+affected path; the underlying graphics-stack cause was not established.
+
+The final fixed freshness footer, missing/nonfinite muzzle follow-up and new-session
+HUD reset were made after that live run; fixture/build checks cover the final
+candidate, but those small follow-ups were not rerun in-game. Full small-window/
+scaling combinations, every label in live combat, all modded weapons, all five
+line shades/eviction via controlled live instrumentation, and performance remain
+unverified. Exact history/colour/eviction rules are verified in deterministic tests.
+Black lines and overlapping histories can be difficult to distinguish visually.
+Each observed projectile (including pellets) counts separately; beams are not
+invented shots; missile lines are initial observed directions, not trajectories.
+
+Evidence and distributable artifacts:
+C:/Users/Minsu/Documents/Codex/2026-11-01/kayn-diagnostics-planning/outputs/
+See IMPLEMENTATION-AND-VERIFICATION.txt, test logs and live-check/ captures/reports.
+Historical results below retain their original versions and limits.
+
 ## Unreleased hardening verification (2026-11-01, local candidate)
 
 This working revision is newer than published 1.3.0. Production Java was changed;

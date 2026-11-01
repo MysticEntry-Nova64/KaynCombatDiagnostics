@@ -1,20 +1,75 @@
-# Kayn Combat Diagnostics 1.3.1
+# Kayn Combat Diagnostics 1.5.0
 
-Version 1.3.1 adds snapshot exception containment, verified archive writes and bounded automatic retries. The original 1.3.0 release remains available.
+Version 1.5.0 adds a compact rounded console board, removes the external font-library dependency and makes the Ctrl shortcuts configurable. Coloured restrictions, freshness indicators and five-projectile histories remain separate from AI behaviour.
 
-Standalone, optional Starsector 0.98a-RC8 combat observer. Requires LazyLib; does not require Verdant, Console Commands, a hullmod, ship IDs or per-ship setup. Enable the mod in the launcher once.
+Standalone, optional Starsector 0.98a-RC8 combat observer. No external mod or library dependencies; uses only the installed game's API, bundled OpenGL runtime and font atlas. Does not require Verdant, Console Commands, a hullmod, ship IDs or per-ship setup. Enable the mod in the launcher once.
 
 Its purpose is to check weapons on custom ship designs: observed firing, projectile/impact counts, firing time, and evidence about readiness or obstruction. A clear line or readiness estimate does not guarantee the game's AI will fire, or that a future projectile will hit. Damage attribution is not a design-validation goal; legacy damage columns remain in the file format for compatibility and are not a validated per-weapon metric.
 
+- Ctrl+F7: show/hide help, including recording and evidence explanations.
 - Ctrl+F8: start/stop diagnostics. Starts off in each battle. Starts a fresh measurement when enabled.
 - Ctrl+F9: pin your selected ship target; press again to follow your controlled ship. Select a friendly or enemy ship using the normal game targeting controls. With no target, stays on your own ship.
 - Ctrl+F10: next weapon page. Six weapons per page; all weapons are included in the saved readout regardless of page.
 
 Automatically follows changes to the controlled ship in self mode. Switching subjects closes the previous measurement and resets counters. Target mode stays pinned until toggled back. Counters cover only the enabled observation interval. Decorative weapons are skipped. Modules/fighters are separate ships: target or control the specific entity to inspect it; this does not aggregate parent and module weapons.
 
-The panel shows hull, flux, recording status, actual FIRING status, weapon group number, SELECTED/AUTO/MANUAL control mode, approximate range MET/OUT, geometry CLEAR/BLOCKED, projectiles/impacts, and beam firing time with observed hit frames. The individual AI firing request is recorded as aiShouldFire in the TSV; it is not displayed as a separate panel field. Weapon text is white by default. The panel shows NO_TARGET when no target is observed, and TARGET SHIP/MISSILE/PROJECTILE/POINT when target evidence is available. Unknown range and line show ?. An observed out-of-range target makes the entry yellow; venting that blocks firing makes it orange; an observed firing-line obstruction makes it red. Red takes priority over orange, then yellow, then white. Beam hit frames count damage-bearing updates, not separate shots. FIRING is observed independently of the individual autofire AI. The detailed file retains readyObserved as an individual-AI readiness estimate, not a group-fire permission flag.
+The panel shows hull, flux, recording status, FIRING activity, group/control mode,
+target provenance, projectile/impact counts and beam duration/hit frames.
+All observed restrictions appear together with independent colours:
+Blocked (orange), Distance (yellow), Fluxing (cyan), NoTarget (grey), Damaged (red),
+Cooldown (blue), NoAmmo (red), Hold (purple), Arc (amber), Overload (red), Unknown
+(grey), and AIHold (purple, explicit individual autofire request is false).
+Hold is the forced-no-fire flag; neither Hold nor AIHold reveals the AI's private
+reason. Fluxing means venting or insufficient reported flux headroom. NoTarget
+means no target is known to this observer, including manual control. It appears
+once as a coloured restriction; a second white NO_TARGET label is not displayed.
+Restriction labels stay visible even while FIRING is independently observed.
+The TSV appends a `restrictions` column; existing priority `state` remains for
+compatibility. HUD labels and the TSV column are captured in the same refresh.
 
-Known observations take priority over an apparent ready state: `COOLDOWN`, `FORCED_NO_FIRE`, `NO_AMMO` and `FLUX_HEADROOM_LOW` identify current measured restrictions. Disabled weapons and ship-level flux restrictions retain their existing priority, and actual `FIRING` remains independent of those readiness estimates. More than one restriction may exist; the TSV retains the separate flags and values. `FLUX_HEADROOM_LOW` compares the reported firing cost with current flux headroom; unusual scripts and beam behavior still need individual validation.
+Each weapon retains five short (90 world-unit) initial observed projectile
+direction lines: bright green, green, dark green, very dark green, black.
+The sixth evicts the oldest. Lines are detached world coordinates: they stay at
+the projectile's reported spawn point as the ship moves. Each newly observed
+projectile counts separately, including simultaneous pellets and burst rounds;
+this is not a trigger counter. Missing/invalid spawn or facing data produces no
+line. Already airborne projectiles at session start are excluded. Missiles show
+first-observed facing, not a predicted trajectory. Continuous beams have their
+duration/contact readout rather than fabricated projectile shots. Coincident
+lines overlap; newest draws last. Black may be hard to see against dark space.
+
+The compact title combines COMBAT DIAGNOSTICS, observed simulation time and
+Recording (or an explicit recording warning). Ship identity follows, then hull,
+flux and weapon count on one line. Page numbering appears only for multiple pages.
+Detailed shortcuts and archive explanations are in Ctrl+F7 help.
+
+The board sizes itself to the visible content, with rounded corners, a muted teal
+border and bounded scrolling. Font parsing, layout, restriction interpretation,
+shot history and recording are separate modules. It never edits game classes,
+ship models, weapon data, AI decisions or shared SpriteAPI properties. It adds
+only its own observer/listeners, readout files and drawing; listeners are removed
+when observation ends. Rendering saves and restores its OpenGL state.
+
+To resolve shortcut collisions, edit this mod's `data/config/settings.json`:
+`kayn_diagnostics_toggle_key`, `subject_key`, `page_key`, `help_key`, `up_key` and
+`down_key` (each with the `kayn_diagnostics_` prefix). Defaults are F8, F9, F10,
+F7, UP and DOWN; every shortcut requires Ctrl. Allowed values are F1–F12, UP
+and DOWN, with no duplicates. Invalid configuration is reported and defaults
+are retained. Restart the game after editing. These safeguards reduce conflict
+risk; they do not establish compatibility with every possible mod.
+
+Freshness displays LIVE, PAUSED, FINAL / STALE or STALE / FAILED, plus age
+in simulation seconds since the last complete snapshot. Normal refresh is 0.25s;
+an age above 0.5s is stale. Pause freezes collection and history, and cached
+FIRING must be interpreted with the stale banner. Ctrl+Up/Down scrolls the panel;
+text is clipped to its bounds. Ctrl+F10 changes the six-weapon page and resets scroll.
+
+Geometry rejects non-finite muzzle/aim/range and invalid entity/shield geometry
+as UNKNOWN rather than CLEAR. Nonpositive range and zero-length aim are UNKNOWN.
+Segments are closed: endpoint touches and collinear overlap count as contact;
+the nearest overlap point is used. The existing small numeric tolerances remain
+local geometry tolerances, not a guarantee for arbitrarily scaled inputs.
+Shield boundary intersections still respect the active arc.
 
 Targets come from an active, unselected autofire group, an AI-controlled selected group (including player autopilot) with an explicit ship-AI target and aim point, or a beam currently applying damage. The nearest enemy and a manually selected ship target are never substituted as weapon intent. Ship-AI-selected intent is distinguished as SHIP_AI_SELECTED_TARGET in the TSV; it is not a guarantee that every weapon in that group can fire. The HUD separates TARGET/NO_TARGET from firing activity. The TSV retains NONE/NO_TARGET when an active autofire plugin reports no target, and UNOBSERVED/TARGET_UNKNOWN when weapon intent is unavailable (including manual control). Actual firing remains FIRING even without target evidence. A live beam contact can establish FIRING and its contact target independently of autofire. Range uses the observed contact point, or a collision-radius approximation for an autofire entity; it is not a guarantee of projectile reach. `AI_HOLD` describes the individual autofire request. `READY_OBSERVED` means the measured readiness checks passed; it does not promise that the weapon will fire or hit.
 
@@ -36,18 +91,22 @@ Limits: firing line is a straight geometric estimate against intervening ships/s
 
 Verdant compatibility: prototype 0.3.5 suppresses its embedded overlay when this mod is enabled, avoiding duplicate observers/panels. Earlier prototypes may show both panels.
 
-Java source and test source included. Build instructions and actual test evidence are in BUILD.md and TEST-RESULTS.md. No proprietary ship art, game classes or fonts are bundled; LazyLib and the game's installed font provide text rendering.
+Java source and test source included. Build instructions and actual test evidence are in BUILD.md and TEST-RESULTS.md. No proprietary ship art, game classes or fonts are bundled; the installed game's font atlas provides text rendering.
 
 ## Installation packages and checks
 
 For a binary release, extract the `KaynCombatDiagnostics` folder from the release ZIP
-into `Starsector/mods`, install LazyLib separately, then enable the mod in the launcher.
+into `Starsector/mods`, then enable the mod in the launcher.
 The GitHub source download needs a local build first. See BUILD.md for building and
-packaging, and RELEASE-NOTES.md for the 1.3.1 release summary.
+packaging, and RELEASE-NOTES.md for the 1.5.0 release summary.
 
-GitHub checks validate documentation and 42 dependency-free math/state and archive-queue assertions.
-The full 222-assertion suite and binary packaging require a local Starsector installation.
+GitHub checks validate documentation and 50 dependency-free math/state, geometry, font and archive-queue assertions.
+The full local game-API fixture suite and binary packaging require a local Starsector installation.
 
 ## License
 
-Project code is available under the MIT license; see LICENSE. Starsector and LazyLib remain separately licensed dependencies and are not bundled.
+Project code is available under the MIT license; see LICENSE. Starsector and its bundled runtimes remain separately licensed dependencies and are not bundled.
+
+## Demonstrations
+
+See the [GIF gallery](https://github.com/MysticEntry-Nova64/KaynCombatDiagnostics/blob/main/docs/media-gallery.md) for live combat footage and clearly labelled display illustrations. The latter demonstrate appearance, not live AI evidence.

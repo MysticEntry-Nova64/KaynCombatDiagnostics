@@ -18,7 +18,7 @@ try {
     $reader = [IO.StreamReader]::new($archive.GetEntry($prefix + 'mod_info.json').Open())
     try { $manifest = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
     if ($manifest.version -ne $ExpectedVersion -or $manifest.id -ne 'kayn_combat_diagnostics') { throw 'Wrong release identity' }
-    if ($manifest.gameVersion -ne '0.98a-RC8' -or @($manifest.dependencies.id) -notcontains 'lw_lazylib') { throw 'Missing supported game/dependency metadata' }
+    if ($manifest.gameVersion -ne '0.98a-RC8' -or @($manifest.dependencies).Count -ne 0) { throw 'Expected supported game metadata and no external dependencies' }
     if (@($manifest.jars).Count -ne 1 -or $manifest.jars[0] -ne 'jars/kayn-combat-diagnostics.jar') { throw 'Wrong runtime JAR path' }
     $reader = [IO.StreamReader]::new($archive.GetEntry($prefix + 'data/config/settings.json').Open())
     try { $settings = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
@@ -37,7 +37,7 @@ try {
                     $entry.FullName -notmatch '^kayn(/diagnostics)?/$' -and
                     $entry.FullName -notmatch '^kayn/diagnostics/[^/]+\.class$') { throw "Unexpected JAR payload: $($entry.FullName)" }
             }
-            if ($classes.FullName -match 'Test[^/]*\.class$') { throw 'Runtime JAR contains tests' }
+            if ($classes.FullName -match '(Test|MediaLab)[^/]*\.class$') { throw 'Runtime JAR contains test or media fixture classes' }
             if ($classes.FullName -cnotcontains 'kayn/diagnostics/CombatDiagnostics.class') { throw 'Plugin entry class missing' }
             foreach ($entry in $classes) {
                 $binary = [IO.BinaryReader]::new($entry.Open())

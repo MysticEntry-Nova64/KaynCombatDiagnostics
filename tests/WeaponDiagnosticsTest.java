@@ -11,6 +11,7 @@ public class WeaponDiagnosticsTest {
   boolean firing,disabled,overloaded,venting,forcedOff,aiTarget=true,wants=true,beam,grouped=true,autofire=true,selected,obstructed,beamContact,missileTarget,shipAI,autopilot,projectileContact;
   float cooldown,currentFlux,fluxCost=10,arcDistance,range=500;
   int ammo=3;
+  Vector2f muzzle=new Vector2f();
   final ShipAPI ship,target;
   final WeaponAPI weapon;
   final WeaponDiagnostics diagnostic;
@@ -24,7 +25,7 @@ public class WeaponDiagnosticsTest {
    ShipAIPlugin pilot=DiagnosticsIntegrationTest.fake(ShipAIPlugin.class,(n,a)->null);
    ship=DiagnosticsIntegrationTest.fake(ShipAPI.class,(n,a)->switch(n){case "getShipAI"->shipAI?pilot:null;case "getShipTarget"->shipAI||autopilot?target:null;case "getMouseTarget"->target.getLocation();case "getFluxTracker"->flux;case "getWeaponGroupFor"->grouped?group:null;case "getSelectedGroupAPI"->selected?group:null;case "getWeaponGroupsCopy"->grouped?List.of(group):List.of();case "getLocation"->new Vector2f();default->null;});
    WeaponSpecAPI spec=DiagnosticsIntegrationTest.fake(WeaponSpecAPI.class,(n,a)->n.equals("getWeaponId")?"fixture_weapon":null);
-   weapon=DiagnosticsIntegrationTest.fake(WeaponAPI.class,(n,a)->switch(n){case "getShip"->ship;case "getSpec"->spec;case "getDisplayName"->"Fixture gun";case "getLocation"->new Vector2f();case "getRange"->range;case "distanceFromArc"->arcDistance;case "isFiring"->firing;case "isDisabled"->disabled;case "isForceNoFireOneFrame"->forcedOff;case "usesAmmo"->true;case "getAmmo"->ammo;case "getCooldownRemaining"->cooldown;case "getFluxCostToFire"->fluxCost;case "isBeam"->beam;default->null;});
+   weapon=DiagnosticsIntegrationTest.fake(WeaponAPI.class,(n,a)->switch(n){case "getShip"->ship;case "getSpec"->spec;case "getDisplayName"->"Fixture gun";case "getLocation"->muzzle;case "getRange"->range;case "distanceFromArc"->arcDistance;case "isFiring"->firing;case "isDisabled"->disabled;case "isForceNoFireOneFrame"->forcedOff;case "usesAmmo"->true;case "getAmmo"->ammo;case "getCooldownRemaining"->cooldown;case "getFluxCostToFire"->fluxCost;case "isBeam"->beam;default->null;});
    diagnostic=new WeaponDiagnostics("mount-a",weapon);
   }
   Map<String,String> read(){
@@ -73,13 +74,13 @@ public class WeaponDiagnosticsTest {
   Map<String,String> row=f.read();
   check(row.get("targetId").equals("NA")&&row.get("rangeStatus").equals("UNKNOWN"),"nearby enemy must not become the weapon's target or range reference");
   check(!panel(f).contains("Range OUT")&&!panel(f).startsWith("!"),"unknown target cannot produce yellow range or red obstruction warnings");
-  check(panel(f).lines().allMatch(s->DiagnosticPanel.lineColor(s).equals(java.awt.Color.WHITE)),"no observed target renders the complete weapon entry white");
-  f.venting=true;check(panel(f).lines().allMatch(s->DiagnosticPanel.lineColor(s).equals(java.awt.Color.ORANGE)),"venting blocks firing and turns entries orange even without a target");f.venting=false;
+  check(f.read().get("restrictions").contains("NoTarget"),"no known target is an explicit restriction");
+  f.venting=true;check(panel(f).contains(WeaponRestriction.FLUXING.markup())&&panel(f).contains(WeaponRestriction.NO_TARGET.markup()),"venting and missing target retain separate colours together");f.venting=false;
   f.aiTarget=true;f.autofire=false;row=f.read();
   check(row.get("state").equals("TARGET_UNKNOWN")&&row.get("aiShouldFire").equals("NA"),"inactive autofire data cannot describe manual weapon intent");
   f.autofire=true;f.selected=true;f.obstructed=false;row=f.read();
   check(row.get("targetId").equals("NA")&&row.get("state").equals("TARGET_UNKNOWN"),"selected group does not inherit a stale autofire target");
-  f.shipAI=true;row=f.read();check(row.get("targetSource").equals("SHIP_AI_SELECTED_TARGET")&&row.get("targetId").equals("target")&&panel(f).contains("TARGET SHIP"),"AI-controlled selected group uses the ship AI's explicit target and aim point");check(row.get("state").equals("OUT_OF_RANGE")&&panel(f).startsWith("~"),"explicit ship AI target outside weapon range is yellow");f.shipAI=false;
+  f.shipAI=true;row=f.read();check(row.get("targetSource").equals("SHIP_AI_SELECTED_TARGET")&&row.get("targetId").equals("target")&&panel(f).contains("TARGET SHIP"),"AI-controlled selected group uses the ship AI's explicit target and aim point");check(row.get("state").equals("OUT_OF_RANGE")&&panel(f).contains(WeaponRestriction.DISTANCE.markup()),"explicit ship AI target outside weapon range is yellow");f.shipAI=false;
   f.firing=true;row=f.read();check(row.get("state").equals("FIRING")&&row.get("rangeStatus").equals("UNKNOWN"),"manual firing without target evidence stays FIRING with unknown range");
   f.autopilot=true;row=f.read();check(row.get("targetSource").equals("SHIP_AI_SELECTED_TARGET"),"player autopilot can supply selected-group intent without a ShipAIPlugin");f.autopilot=false;
   f.firing=false;f.beam=true;f.beamContact=true;row=f.read();
@@ -90,23 +91,29 @@ public class WeaponDiagnosticsTest {
   f.selected=false;f.missileTarget=true;f.obstructed=false;row=f.read();
   check(row.get("targetId").equals("MISSILE")&&row.get("rangeStatus").equals("MET"),"autofire missile target is measured instead of distant enemy ship");
   f.missileTarget=false;check(panel(f).contains("TARGET SHIP"),"observed ship target is explicitly labeled TARGET");
-  f.aiTarget=false;check(panel(f).contains("NO_TARGET")&&!panel(f).contains("TARGET_UNKNOWN"),"no observed target uses the requested NO_TARGET label on screen");
+  f.aiTarget=false;String absent=panel(f);
+  check(!absent.contains("NO_TARGET")&&!absent.contains("TARGET_UNKNOWN")&&absent.split("NoTarget",-1).length==2,"missing target appears once as the coloured restriction");
  }
  static void presentation(){
   Fixture f=new Fixture();f.range=100;
-  check(panel(f).lines().allMatch(s->s.startsWith("~")),"all lines of an out-of-range weapon are marked yellow");
+  check(panel(f).contains(WeaponRestriction.DISTANCE.markup()),"distance restriction has its own yellow colour");
   f.venting=true;
-  check(panel(f).lines().allMatch(s->s.startsWith("^")),"venting orange takes priority over out-of-range yellow");
+  check(panel(f).contains(WeaponRestriction.FLUXING.markup())&&panel(f).contains(WeaponRestriction.DISTANCE.markup()),"venting does not hide distance");
   f.obstructed=true;
-  check(panel(f).lines().allMatch(s->s.startsWith("!")),"existing obstruction red takes priority over orange and yellow");
+  check(panel(f).contains(WeaponRestriction.BLOCKED.markup())&&panel(f).contains(WeaponRestriction.FLUXING.markup())&&panel(f).contains(WeaponRestriction.DISTANCE.markup()),"blocked does not hide other restrictions");
   f.obstructed=false;
   f.venting=false;f.range=500;f.beam=true;f.firing=true;
   f.diagnostic.advance(.5f);f.diagnostic.recordBeamDamageFrame();f.diagnostic.recordBeamDamageFrame();
   check(panel(f).contains("Beam 0.50s | Hit frames 2"),"beam firing duration and observed damage frames are visible together");
-  check(DiagnosticPanel.lineColor("~range").equals(java.awt.Color.YELLOW),"range marker renders yellow");
-  check(DiagnosticPanel.lineColor("^venting").equals(java.awt.Color.ORANGE),"venting marker renders orange");
-  check(DiagnosticPanel.lineColor("!blocked").equals(new java.awt.Color(255,90,90)),"obstruction retains its existing red");
-  check(DiagnosticPanel.visibleLine("~range").equals("range")&&DiagnosticPanel.visibleLine("^venting").equals("venting")&&DiagnosticPanel.visibleLine("!blocked").equals("blocked"),"internal color markers are hidden from the display");
+  java.util.List<DiagnosticPanel.Span> spans=DiagnosticPanel.spans("{#ffa040}Blocked{#ffffff} | {#40e8ff}Fluxing");
+  check(spans.size()==3&&spans.get(0).text().equals("Blocked")&&spans.get(0).color().equals(WeaponRestriction.BLOCKED.color),"inline blocked colour and visible text decoded");
+  check(spans.get(2).text().equals("Fluxing")&&spans.get(2).color().equals(WeaponRestriction.FLUXING.color),"second restriction keeps its independent colour");
+  f.beam=false;f.firing=false;f.disabled=true;f.ammo=0;f.cooldown=1;f.currentFlux=995;f.forcedOff=true;f.range=100;f.arcDistance=1;f.obstructed=true;
+  Map<String,String> all=f.read();
+  for(String label:List.of("Blocked","Distance","Fluxing","Damaged","Cooldown","NoAmmo","Hold","Arc"))
+   check(all.get("restrictions").contains(label)&&panel(f).contains(label),"simultaneous restriction survives TSV and HUD: "+label);
+  check(panel(f).lines().filter(l->l.contains("{#")).allMatch(l->l.chars().filter(c->c=='|').count()<4),"short labels wrap in groups of four");
+
  }
  public static void main(String[] args){if(args.length==0||args[0].equals("target"))targetAccuracy();if(args.length==0||args[0].equals("presentation"))presentation();if(args.length==0||args[0].equals("readiness"))readiness();if(args.length==0||args[0].equals("counters"))counters();System.out.println("PASS: "+assertions+" weapon diagnostics assertions");}
 }

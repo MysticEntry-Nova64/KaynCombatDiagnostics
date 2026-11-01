@@ -23,4 +23,6 @@ nav:
   - Build and installation: build.md
   - Verification evidence: verification.md
   - Reliability patterns: reliability-patterns.md
+  - Weapon evidence patterns: weapon-evidence-patterns.md
+  - GIF gallery: media-gallery.md
   - Documentation workflow: documentation.md

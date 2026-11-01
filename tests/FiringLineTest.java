@@ -11,6 +11,7 @@ public class FiringLineTest {
  check(Math.abs(FiringLine.segmentHit(p(0,0),p(100,0),p(40,-10),p(40,10))-.4f)<.001,"hull crossing");
  check(!Float.isFinite(FiringLine.segmentHit(p(0,0),p(100,0),p(40,10),p(60,10))),"parallel clear");
  check(!Float.isFinite(FiringLine.circleHit(p(0,0),p(0,0),p(50,0),10)),"zero length");
+ check(Math.abs(FiringLine.circleHit(p(0,0),p(1e10f,0),p(5e9f,0),1e9f)-.4f)<.001,"finite large geometry must not overflow into a false clear");
  System.out.println("PASS: "+count+" firing-line geometry assertions");
  }
 }

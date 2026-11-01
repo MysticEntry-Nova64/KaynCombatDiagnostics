@@ -58,6 +58,7 @@ public class RecordingReliabilityTest {
  static void liveFailure(){
   Fixture f=new Fixture();f.failLive=true;f.enable();f.diagnostic.advance(2,List.of());
   check(f.liveAttempts()==1,"live failure does not retry every frame");
+  check(f.diagnostic.hudText().contains("LIVE FAILED")&&!f.diagnostic.hudText().contains("s | Recording\n"),"compact title preserves visible live-file failure rather than a healthy recording label");
   f.disable();
   check(f.files.keySet().stream().anyMatch(s->!s.equals(CombatDiagnostics.FILE)),"live-file failure must not suppress the final archive attempt");
   check(f.listeners.isEmpty(),"live failure does not prevent listener cleanup");

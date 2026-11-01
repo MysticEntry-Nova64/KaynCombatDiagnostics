@@ -19,6 +19,9 @@ public class DiagnosticsIntegrationTest {
   return type.cast(Proxy.newProxyInstance(type.getClassLoader(),new Class[]{type},(p,m,a)->{
    if(m.getName().equals("hashCode")) return System.identityHashCode(p);
    if(m.getName().equals("equals")) return p==a[0];
+   if(type.getPackageName().startsWith("com.fs.starfarer.api.combat") &&
+       m.getName().matches("(?:set|force|giveCommand|disable|repair|apply|spawn|endCombat|removeEntity|modify).*"))
+       throw new AssertionError("Observer attempted to mutate combat API: "+type.getSimpleName()+"."+m.getName());
    Object r=fn.apply(m.getName(),a); if(r!=null)return r;
    Class<?> c=m.getReturnType(); if(c==boolean.class)return false;
    if(c==float.class)return 0f; if(c==int.class)return 0; if(c==long.class)return 0L;
@@ -53,11 +56,16 @@ public class DiagnosticsIntegrationTest {
   check(writes==0&&listeners.isEmpty(),"off by default does not collect");
   press(d,org.lwjgl.input.Keyboard.KEY_F8);d.advance(.5f,List.of());
   check(d.snapshot("").contains("gun-a"),"toggle discovers arbitrary hull and slot names");
+  check(d.hudText().contains("s | Recording\n")&&!d.hudText().contains("archive on stop")&&!d.hudText().contains("Observed firing, impacts and readiness")&&!d.hudText().contains("Page"),"actual HUD assembles the compact one-page layout without redundant lines");
+  press(d,org.lwjgl.input.Keyboard.KEY_F7);check(d.hudText().contains("All shortcuts use Ctrl")&&d.hudText().contains("Reports archive on stop"),"help exposes removed explanations on demand");
+  press(d,org.lwjgl.input.Keyboard.KEY_F7);check(!d.hudText().contains("All shortcuts use Ctrl"),"help closes without disabling recording");
   check(consumed,"recognized key consumed");
   check(listeners.size()==1,"one listener per enemy");
-  DamagingProjectileAPI projectile=fake(DamagingProjectileAPI.class,(n,a)->switch(n){case "getSource"->hunter;case "getWeapon"->weapons.get(0);case "didDamage"->hit;case "getDamageTarget"->enemy;default->null;});
+  DamagingProjectileAPI projectile=fake(DamagingProjectileAPI.class,(n,a)->switch(n){case "getSpawnLocation"->new Vector2f(10,20);case "getFacing"->30f;case "getSource"->hunter;case "getWeapon"->weapons.get(0);case "didDamage"->hit;case "getDamageTarget"->enemy;default->null;});
   projectiles.add(projectile);d.advance(.5f,List.of());hit=true;d.advance(.5f,List.of());d.advance(.5f,List.of());
   check(d.snapshot("gun-a").contains("\t1\t1\t0\t"),"projectile/impact deduplication");
+  check(d.shotLines("gun-a").size()==1&&d.shotLines("gun-b").isEmpty(),"new projectile adds exactly one vector only to its originating weapon");
+  check(d.shotLines("gun-a").get(0).x()==10&&d.shotLines("gun-a").get(0).y()==20,"engine observation preserves projectile spawn origin");
   check(d.snapshot("gun-a").contains("FIRING"),"actual firing overrides no individual AI request");
   boolean[] finalHit={false};
   DamagingProjectileAPI finalFrame=fake(DamagingProjectileAPI.class,(n,a)->switch(n){case "getSource"->hunter;case "getWeapon"->weapons.get(0);case "didDamage"->finalHit[0];case "getDamageTarget"->enemy;default->null;});
@@ -68,8 +76,11 @@ public class DiagnosticsIntegrationTest {
   finalHit[0]=false;projectiles.add(finalFrame);d.advance(.5f,List.of());projectiles.remove(finalFrame);d.advance(.5f,List.of());
   check(d.snapshot("gun-a").contains("\t3\t2\t0\t"),"a removed projectile with no damage is not counted as a hit");
   int before=writes;String state=d.snapshot("");paused=true;d.advance(5,List.of());check(writes==before&&state.equals(d.snapshot("")),"pause freezes collection");
+  check(d.hudText().contains("PAUSED | Evidence age")&&d.hudText().contains("s | Recording"),"pause remains visible independently of recording status");
+  check(d.shotLines("gun-a").size()==1,"pause preserves rather than ages or duplicates vectors");
   press(d,org.lwjgl.input.Keyboard.KEY_F8);check(listeners.isEmpty(),"disable while paused removes listeners");before=writes;paused=false;d.advance(5,List.of());check(writes==before,"disabled stops writes");
   press(d,org.lwjgl.input.Keyboard.KEY_F8);d.advance(.5f,List.of());check(d.snapshot("gun-a").contains("\t0\t0\t0\t"),"fresh session excludes pre-existing projectile");
+  check(d.shotLines("gun-a").isEmpty(),"new measurement resets vectors and excludes already airborne projectiles");
   press(d,org.lwjgl.input.Keyboard.KEY_F9);d.advance(.5f,List.of());check(d.snapshot("").contains("enemy-2")&&!d.snapshot("").contains("gun-a\t"),"target mode switches subject and resets weapon rows");
   press(d,org.lwjgl.input.Keyboard.KEY_F9);d.advance(.5f,List.of());check(d.snapshot("").contains("ordinary-1"),"return to player");
   player=enemy;d.advance(.5f,List.of());check(d.snapshot("").contains("enemy-2"),"automatic player ship transfer");

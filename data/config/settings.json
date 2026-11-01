@@ -1,5 +1,11 @@
 {
   "plugins": {
     "kayn_combat_diagnostics": "kayn.diagnostics.CombatDiagnostics"
-  }
+  },
+  "kayn_diagnostics_toggle_key": "F8",
+  "kayn_diagnostics_subject_key": "F9",
+  "kayn_diagnostics_page_key": "F10",
+  "kayn_diagnostics_help_key": "F7",
+  "kayn_diagnostics_up_key": "UP",
+  "kayn_diagnostics_down_key": "DOWN"
 }

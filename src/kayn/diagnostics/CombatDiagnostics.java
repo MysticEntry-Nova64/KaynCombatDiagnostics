@@ -30,15 +30,25 @@ public class CombatDiagnostics extends BaseEveryFrameCombatPlugin {
     private boolean enabled, targetMode, combatEnded;
     private ShipAPI pinned;
     private int page;
+    private float capturedAt;
+    private int panelScroll;
+    private boolean showHelp;
+    private DiagnosticKeys keys=DiagnosticKeys.DEFAULT;
     private String stopReason = "";
     private String observationWarning = "";
     private final Map<WeaponAPI, WeaponDiagnostics> weaponRows = new IdentityHashMap<>();
     private final Map<String, String> publishedRows = new HashMap<>();
     public CombatDiagnostics() { this("combat"); }
     public CombatDiagnostics(String scenario) { this.scenario = scenario; }
+    List<ShotHistory.Line> shotLines(String slot) {
+        WeaponDiagnostics row=rows.get(slot);
+        return row==null?List.of():row.shots().lines();
+    }
     private static <T> Set<T> identitySet() { return Collections.newSetFromMap(new IdentityHashMap<T, Boolean>()); }
     public void init(CombatEngineAPI engine) {
         this.engine = engine;
+        try {keys=DiagnosticKeys.load(name->Global.getSettings().getString(name));}
+        catch(RuntimeException error){reportFailure("key configuration","diagnostic settings; using defaults",error);}
         recording = new DiagnosticRecorder(
             (filename, contents) -> {
                 Global.getSettings().writeTextFileToCommon(filename, contents);
@@ -66,28 +76,36 @@ public class CombatDiagnostics extends BaseEveryFrameCombatPlugin {
         for(InputEventAPI e:events) {
             if(e.isConsumed() || !e.isKeyDownEvent() || e.isRepeat() || !e.isCtrlDown() || e.isAltDown() || e.isShiftDown()) continue;
             int key=e.getEventValue();
-            if(key==org.lwjgl.input.Keyboard.KEY_F8) {
+            if(enabled && key==keys.code(DiagnosticKeys.Action.HELP)) {
+                e.consume();showHelp=!showHelp;panelScroll=0;continue;
+            }
+            if(enabled && (key==keys.code(DiagnosticKeys.Action.UP) || key==keys.code(DiagnosticKeys.Action.DOWN))) {
+                e.consume();panelScroll=Math.max(0,panelScroll+(key==keys.code(DiagnosticKeys.Action.DOWN)?1:-1));continue;
+            }
+            if(key==keys.code(DiagnosticKeys.Action.TOGGLE)) {
                 e.consume();
                 enabled=!enabled;
                 if(!enabled) { finish("disabled"); hunter=null; pinned=null; targetMode=false; }
-                else { finished=false; stopReason=""; recording.retryPendingArchives(); }
-            } else if(enabled && key==org.lwjgl.input.Keyboard.KEY_F9) {
+                else { finished=false; stopReason=""; panel=null; recording.retryPendingArchives(); }
+            } else if(enabled && key==keys.code(DiagnosticKeys.Action.SUBJECT)) {
                 e.consume();
                 ShipAPI player=engine.getPlayerShip();
                 if(targetMode) { targetMode=false; pinned=null; }
                 else if(player!=null && player.getShipTarget()!=null) { targetMode=true; pinned=player.getShipTarget(); }
-            } else if(enabled && key==org.lwjgl.input.Keyboard.KEY_F10) {
+            } else if(enabled && key==keys.code(DiagnosticKeys.Action.PAGE)) {
                 e.consume();
-                page=(page+1)%Math.max(1,(rows.size()+5)/6); if(hunter!=null) buildSnapshot();
+                panelScroll=0;page=(page+1)%Math.max(1,(rows.size()+5)/6); if(hunter!=null) buildSnapshot();
             }
         }
     }
     private void start(ShipAPI ship) {
         if(hunter!=null) finish("ship changed");
-        hunter=ship;finished=false;recording.beginSession();stopReason="";elapsed=refresh=disk=0;page=0;
+        hunter=ship;finished=false;recording.beginSession();stopReason="";elapsed=refresh=disk=0;capturedAt=0;page=0;panelScroll=0;
         session=UUID.randomUUID().toString();rows.clear();weaponRows.clear();
         publishedRows.clear();
         observationWarning="";
+        panelHeader="New session; no complete snapshot\n";
+        panelRows="";
         snapshot="# Kayn combat diagnostics v1\n# session="+session+" noCompleteSnapshot=true\n"+WeaponDiagnostics.HEADER;
         Arrays.fill(damage,0);Arrays.fill(unknown,0);detach();
         for(WeaponAPI w:ship.getAllWeapons()) {
@@ -145,9 +163,23 @@ public class CombatDiagnostics extends BaseEveryFrameCombatPlugin {
         catch (RuntimeException error) { stopAfterFailure("panel", error); }
     }
     private void renderPanel() {
-        if (!overlay || !enabled || engine == null || !engine.isUIShowingHUD() || engine.isUIShowingDialog()) return;
-        if (panel == null) panel = new DiagnosticPanel();
-        panel.draw(hunter==null?"COMBAT DIAGNOSTICS | Waiting for your ship\n"+observationWarning+"Ctrl+F8: off":panelHeader+observationWarning+recording.status()+panelRows, engine.isPaused());
+        if (!overlay || (!enabled && observationWarning.isEmpty()) || engine == null || !engine.isUIShowingHUD() || engine.isUIShowingDialog()) return;
+        if (panel == null) panel = new DiagnosticPanel(keys.footer());
+        panel.draw(hudText(),ObservationFreshness.state(engine.isPaused(),finished,!observationWarning.isEmpty(),elapsed-capturedAt),panelScroll);
+    }
+    String hudText() {
+        if(hunter==null && observationWarning.isEmpty()) return "COMBAT DIAGNOSTICS | Waiting for your ship\n";
+        String summary=recording.summary();
+        if(summary.contains("FAILED") || summary.contains("failed")) summary="{#ff6060}"+summary+"{#ffffff}";
+        return DiagnosticHud.title(elapsed,summary)+panelHeader+
+            ObservationFreshness.label(engine.isPaused(),finished,!observationWarning.isEmpty(),elapsed-capturedAt)+"\n"+
+            observationWarning+(showHelp?DiagnosticHud.help(keys):"")+panelRows;
+    }
+    public void renderInWorldCoords(ViewportAPI viewport) {
+        if(!overlay || !enabled || engine==null || hunter==null || finished || !observationWarning.isEmpty() ||
+                !engine.isUIShowingHUD() || engine.isUIShowingDialog())return;
+        try { ShotVectorRenderer.draw(rows.values(),viewport); }
+        catch(RuntimeException error){stopAfterFailure("shot vectors",error);}
     }
     private WeaponDiagnostics rowFor(WeaponAPI weapon) {
         return weaponRows.get(weapon);
@@ -158,7 +190,7 @@ public class CombatDiagnostics extends BaseEveryFrameCombatPlugin {
         current.removeIf(p -> p.getSource() != hunter);
         for (DamagingProjectileAPI p : current) {
             WeaponDiagnostics row = rowFor(p.getWeapon());
-            if (row != null && !previous.contains(p)) row.recordProjectile();
+            if (row != null && !previous.contains(p)) row.recordProjectile(p);
             observeImpact(p);
         }
         for (DamagingProjectileAPI p : previous) if (!current.contains(p)) observeImpact(p);
@@ -253,21 +285,18 @@ public class CombatDiagnostics extends BaseEveryFrameCombatPlugin {
             out.append(row.line());
         }
         for (Map.Entry<String,WeaponDiagnostics> entry : rows.entrySet()) nextRows.put(entry.getKey(),entry.getValue().line());
-        StringBuilder hud = new StringBuilder("COMBAT DIAGNOSTICS | "+(finished?"FINAL":"LIVE")+" | "+Math.round(elapsed)+"s\n");
-        hud.append(shortText(hunter.getHullSpec().getHullName(),34)).append(targetMode?" [TARGET]":" [YOUR SHIP]").append('\n');
-        hud.append("Hull ").append(Math.round(hunter.getHitpoints())).append("  Flux ").append(Math.round(hunter.getFluxTracker().getCurrFlux())).append(" / ").append(Math.round(hunter.getFluxTracker().getMaxFlux())).append('\n');
-        hud.append("Observed firing, impacts and readiness\n");
-        hud.append("Ctrl+F8 on/off | F9 target/self | F10 page\n");
         int pages=Math.max(1,(rows.size()+5)/6);page=Math.min(page,pages-1);
-        hud.append("Weapons ").append(rows.size()).append(" | page ").append(page+1).append('/').append(pages).append(" (all keys use Ctrl)\n");
-        String nextHeader = hud.toString();
-        hud = new StringBuilder("\n");
+        String nextHeader=DiagnosticHud.ship(shortText(hunter.getHullSpec().getHullName(),34),targetMode,
+            Math.round(hunter.getHitpoints()),Math.round(hunter.getFluxTracker().getCurrFlux()),
+            Math.round(hunter.getFluxTracker().getMaxFlux()),rows.size(),page,pages);
+        StringBuilder hud = new StringBuilder("\n");
         int index=0;
         for(WeaponDiagnostics row:rows.values()) {
             int i=index++;
             if(i>=page*6&&i<(page+1)*6)row.appendPanel(hud);
         }
         // Publish the readout only after both TSV and HUD construction succeeded.
+        capturedAt=elapsed;
         snapshot = out.toString();
         publishedRows.clear();publishedRows.putAll(nextRows);
         panelHeader = nextHeader;

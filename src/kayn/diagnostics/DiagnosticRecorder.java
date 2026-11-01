@@ -119,6 +119,15 @@ final class DiagnosticRecorder {
         try { failures.report(operation, filename, error); } catch (RuntimeException ignored) { }
     }
 
+    String summary() {
+        String value=status();
+        return switch(value) {
+            case "Recording: live; archive on stop" -> "Recording";
+            case "Recording: archived" -> "Archived";
+            default -> value.substring("Recording: ".length());
+        };
+    }
+
     String status() {
         if (unqueuedFailure) return "Recording: ARCHIVE FAILED (queue limit; see log)";
         if (!pending.isEmpty()) {

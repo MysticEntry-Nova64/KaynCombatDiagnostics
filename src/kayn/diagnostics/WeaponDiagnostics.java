@@ -6,7 +6,16 @@ import org.lwjgl.util.vector.Vector2f;
 
 /** One weapon's counters, readiness observations and synchronized TSV/HUD readout. */
 final class WeaponDiagnostics {
-    static final String HEADER = "slot\tweapon\tstate\tfiring\tfiringSeconds\tprojectilesObserved\timpactsObserved\tbeamDamageFrames\taiShouldFire\tautofire\tselectedGroup\ttargetSource\ttargetId\tcentreDistance\tsurfaceDistanceApprox\trange\tpointInArc\tcooldown\tammo\tdisabled\tforceNoFire\tshieldDamageDirect\tarmorDamageDirect\thullDamageDirect\tempDamageDirect\trangeStatus\treadyObserved\tfireLineGeometry\tblockerId\tcontrolMode\tgroupNumber\n";
+    static final String HEADER = "slot\tweapon\tstate\tfiring\tfiringSeconds\tprojectilesObserved\timpactsObserved\tbeamDamageFrames\taiShouldFire\tautofire\tselectedGroup\ttargetSource\ttargetId\tcentreDistance\tsurfaceDistanceApprox\trange\tpointInArc\tcooldown\tammo\tdisabled\tforceNoFire\tshieldDamageDirect\tarmorDamageDirect\thullDamageDirect\tempDamageDirect\trangeStatus\treadyObserved\tfireLineGeometry\tblockerId\tcontrolMode\tgroupNumber\trestrictions\n";
+    private final ShotHistory shots=new ShotHistory();
+    private java.util.List<WeaponRestriction> restrictions=java.util.List.of();
+    private String targetSourceLabel="UNOBSERVED";
+    ShotHistory shots() { return shots; }
+    void recordProjectile(DamagingProjectileAPI projectile) {
+        recordProjectile();
+        // Spawn location is more precise than an estimated barrel index. Never use a moved projectile position.
+        shots.add(projectile.getSpawnLocation(),projectile.getFacing());
+    }
     private final String slot;
     private final WeaponAPI weapon;
     private long projectiles, impacts, beamFrames;
@@ -36,21 +45,25 @@ final class WeaponDiagnostics {
         CombatEntityAPI target = evidence.entity();
         Vector2f point = evidence.point();
         String targetSource = evidence.source();
+        targetSourceLabel=targetSource;
         boolean beamContact = evidence.beamContact();
         targetLabel = evidence.label();
         observedTarget = point!=null;
         fireLine = point==null ? new FiringLine.Result("UNKNOWN","-") : FiringLine.trace(w, target, point, engine);
         // Entity range is a collision-radius approximation; beam contact uses the actual contact point.
         Vector2f rangePoint = !beamContact && target!=null ? target.getLocation() : point;
-        float centre = rangePoint == null ? Float.NaN : Vector2f.sub(rangePoint, w.getLocation(), null).length();
+        float centre = !FiringLine.finite(rangePoint) || !FiringLine.finite(w.getLocation()) ? Float.NaN : Vector2f.sub(rangePoint, w.getLocation(), null).length();
         float surface = DiagnosticMath.surfaceDistance(centre, beamContact||target==null ? 0 : target.getCollisionRadius());
-        boolean arc = point != null && w.distanceFromArc(point) <= 0;
+        float arcDistance=FiringLine.finite(point)&&FiringLine.finite(w.getLocation())?w.distanceFromArc(point):Float.NaN;
+        boolean arcKnown=Float.isFinite(arcDistance);
+        boolean arc = arcKnown && arcDistance <= 0;
         boolean disabled = w.isDisabled() || w.isForceDisabled();
         venting = hunter.getFluxTracker().isVenting();
         boolean blocked = hunter.getFluxTracker().isOverloaded() || venting;
         boolean wants = evidence.wantsFire();
         boolean rangeMet = DiagnosticMath.inRange(surface, w.getRange());
-        rangeStatus = point == null ? "UNKNOWN" : rangeMet ? "MET" : "OUT";
+        boolean rangeKnown=FiringLine.finite(point)&&Float.isFinite(surface)&&Float.isFinite(w.getRange())&&w.getRange()>0;
+        rangeStatus = !rangeKnown ? "UNKNOWN" : rangeMet ? "MET" : "OUT";
         firing = w.isFiring() || beamContact;
         boolean forcedOff = w.isForceNoFireOneFrame();
         boolean usesAmmo = w.usesAmmo();
@@ -60,8 +73,12 @@ final class WeaponDiagnostics {
         float headroom = hunter.getFluxTracker().getMaxFlux()-hunter.getFluxTracker().getCurrFlux();
         WeaponReadiness readiness = new WeaponReadiness(disabled, blocked, forcedOff,
             ammo, cooldown, fluxCost, headroom);
-        boolean ready = readiness.ready(evidence, rangeMet, arc);
+        restrictions=WeaponRestriction.observe(readiness,evidence,rangeKnown,rangeMet,arcKnown,arc,fireLine,
+            venting,hunter.getFluxTracker().isOverloaded());
+        boolean ready = rangeKnown && arcKnown && !restrictions.contains(WeaponRestriction.UNKNOWN) && readiness.ready(evidence, rangeMet, arc);
         state = readiness.state(evidence, firing, rangeMet, arc);
+        if(!firing && restrictions.contains(WeaponRestriction.UNKNOWN) &&
+                ("OUT_OF_RANGE".equals(state)||"OUT_OF_ARC".equals(state)||"READY_OBSERVED".equals(state))) state="UNKNOWN";
         displayName = w.getDisplayName();
         groupNumber = group==null ? 0 : hunter.getWeaponGroupsCopy().indexOf(group)+1;
         mode = controlMode(hunter, group);
@@ -70,42 +87,35 @@ final class WeaponDiagnostics {
             text(projectiles), text(impacts), text(beamFrames), ai == null ? "NA" : text(wants),
             text(group != null && group.isAutofiring()), text(group != null && group == hunter.getSelectedGroupAPI()),
             targetSource, safe(evidence.id()), n(centre), n(surface), n(w.getRange()),
-            point == null ? "NA" : text(arc), n(cooldown), usesAmmo ? text(ammo) : "unlimited",
+            !arcKnown ? "NA" : text(arc), n(cooldown), usesAmmo ? text(ammo) : "unlimited",
             text(disabled), text(forcedOff), text(damage[0]), text(damage[1]), text(damage[2]), text(damage[3]),
-            rangeStatus, text(ready), fireLine.status(), safe(fireLine.blocker()), mode, text(groupNumber)) + "\n";
+            rangeStatus, text(ready), fireLine.status(), safe(fireLine.blocker()), mode, text(groupNumber), restrictions.isEmpty()?"-":restrictions.stream().map(r->r.label).collect(java.util.stream.Collectors.joining("|"))) + "\n";
     }
 
     void appendPanel(StringBuilder hud) {
-        String mark = colorMarker();
-        hud.append(mark).append(shortText(slot, 14)).append(" ")
-            .append(shortText(displayName, 25)).append(" G").append(groupNumber).append('\n');
-        hud.append(mark).append(observedTarget ? "TARGET " + targetLabel : "NO_TARGET")
-            .append(" | ").append(activity()).append(" | ").append(mode).append('\n');
-        hud.append(mark).append("Range ").append(unknownAsQuestion(rangeStatus))
-            .append(" | Line ").append(unknownAsQuestion(fireLine.status())).append(" | ");
-        if (weapon.isBeam()) {
-            hud.append("Beam ").append(n(firingSeconds)).append("s | Hit frames ").append(beamFrames);
-        } else {
-            hud.append("Shots/hits ").append(projectiles).append('/').append(impacts);
+        hud.append(shortText(slot,14)).append(" ").append(shortText(displayName,25))
+            .append(" G").append(groupNumber).append(" | ").append(activity()).append('\n');
+        if(observedTarget) hud.append("TARGET ").append(targetLabel).append(" | ").append(mode)
+            .append(" | ").append(targetSourceLabel).append('\n');
+        else hud.append(mode).append('\n');
+        if(restrictions.isEmpty()) hud.append("Observed restrictions: none\n");
+        else {
+            int column=0;
+            for(WeaponRestriction restriction:restrictions) {
+                if(column>0)hud.append("{#ffffff} | ");
+                hud.append(restriction.markup());
+                // At most four short labels per physical row; panel can scroll on small screens.
+                if(++column==4){hud.append('\n');column=0;}
+            }
+            if(column!=0)hud.append('\n');
         }
+        if(weapon.isBeam()) hud.append("Beam ").append(n(firingSeconds)).append("s | Hit frames ").append(beamFrames);
+        else hud.append("Projectiles/impacts ").append(projectiles).append('/').append(impacts);
         hud.append('\n');
     }
 
-    private String colorMarker() {
-        if (fireLine.blocked()) return "!";
-        if (venting && !firing) return "^";
-        if (observedTarget && "OUT".equals(rangeStatus)) return "~";
-        return "";
-    }
-
     private String activity() {
-        if (firing) return "FIRING";
-        if ("NO_TARGET".equals(state) || "TARGET_UNKNOWN".equals(state)) return "IDLE";
-        return state;
-    }
-
-    private static String unknownAsQuestion(String value) {
-        return "UNKNOWN".equals(value) ? "?" : value;
+        return firing ? "FIRING" : "IDLE";
     }
 
     private static String text(Object value) { return String.valueOf(value); }
