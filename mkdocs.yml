@@ -20,6 +20,7 @@ markdown_extensions:
       check_paths: true
 nav:
   - Overview: index.md
+  - Detailed usage and limitations: reference.md
   - Build and installation: build.md
   - Verification evidence: verification.md
   - Reliability patterns: reliability-patterns.md

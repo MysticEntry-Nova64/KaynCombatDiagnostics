@@ -1,210 +1,151 @@
 # Kayn Combat Diagnostics 1.5.0
 
-Version 1.5.0 adds a compact rounded console board, removes the external font-library dependency and makes the Ctrl shortcuts configurable. Coloured restrictions, freshness indicators and five-projectile histories remain separate from AI behaviour.
+A **standalone combat diagnostics mod for Starsector 0.98a-RC8**. No other mods
+or libraries required. Observe your ship or a selected ship, check weapon activity,
+and save session reports. It does not change ship behaviour or weapon AI.
 
-Standalone, optional Starsector 0.98a-RC8 combat observer. No external mod or library dependencies; uses only the installed game's API, bundled OpenGL runtime and font atlas. Does not require Verdant, Console Commands, a hullmod, ship IDs or per-ship setup. Enable the mod in the launcher once.
+## Install
 
-Its purpose is to check weapons on custom ship designs: observed firing, projectile/impact counts, firing time, and evidence about readiness or obstruction. A clear line or readiness estimate does not guarantee the game's AI will fire, or that a future projectile will hit. Damage attribution is not a design-validation goal; legacy damage columns remain in the file format for compatibility and are not a validated per-weapon metric.
+1. Download the **KaynCombatDiagnostics-1.5.0.zip** mod package from [Releases](https://github.com/MysticEntry-Nova64/KaynCombatDiagnostics/releases/latest).
+2. Extract the `KaynCombatDiagnostics` folder into your `Starsector/mods` folder.
+3. Check that `Starsector/mods/KaynCombatDiagnostics/mod_info.json` exists.
+4. Enable **Kayn Combat Diagnostics** in the Starsector launcher and start the game.
+5. Enter combat and press **Ctrl+F8** to begin.
 
-- Ctrl+F7: show/hide help, including recording and evidence explanations.
-- Ctrl+F8: start/stop diagnostics. Starts off in each battle. Starts a fresh measurement when enabled.
-- Ctrl+F9: pin your selected ship target; press again to follow your controlled ship. Select a friendly or enemy ship using the normal game targeting controls. With no target, stays on your own ship.
-- Ctrl+F10: next weapon page. Six weapons per page; all weapons are included in the saved readout regardless of page.
+Use the mod ZIP; GitHub's **Source code** downloads require a local build.
 
-Automatically follows changes to the controlled ship in self mode. Switching subjects closes the previous measurement and resets counters. Target mode stays pinned until toggled back. Counters cover only the enabled observation interval. Decorative weapons are skipped. Modules/fighters are separate ships: target or control the specific entity to inspect it; this does not aggregate parent and module weapons.
+## Shortcuts
 
-The panel shows hull, flux, recording status, FIRING activity, group/control mode,
-target provenance, projectile/impact counts and beam duration/hit frames.
-All observed restrictions appear together with independent colours:
-Blocked (orange), Distance (yellow), Fluxing (cyan), NoTarget (grey), Damaged (red),
-Cooldown (blue), NoAmmo (red), Hold (purple), Arc (amber), Overload (red), Unknown
-(grey), and AIHold (purple, explicit individual autofire request is false).
-Hold is the forced-no-fire flag; neither Hold nor AIHold reveals the AI's private
-reason. Fluxing means venting or insufficient reported flux headroom. NoTarget
-means no target is known to this observer, including manual control. It appears
-once as a coloured restriction; a second white NO_TARGET label is not displayed.
-Restriction labels stay visible even while FIRING is independently observed.
-The TSV appends a `restrictions` column; existing priority `state` remains for
-compatibility. HUD labels and the TSV column are captured in the same refresh.
+| Shortcut | Action |
+| --- | --- |
+| **Ctrl+F8** | Start a fresh measurement or stop and archive the current one. |
+| **Ctrl+F9** | Pin your selected friendly/enemy ship; press again to follow your controlled ship. With no target, stay on your ship. |
+| **Ctrl+F10** | Next weapon page (six weapons per page). |
+| **Ctrl+F7** | Show or hide help while diagnostics are enabled. |
+| **Ctrl+Up / Ctrl+Down** | Scroll the panel. |
 
-Each weapon retains five short (90 world-unit) initial observed projectile
-direction lines: bright green, green, dark green, very dark green, black.
-The sixth evicts the oldest. Lines are detached world coordinates: they stay at
-the projectile's reported spawn point as the ship moves. Each newly observed
-projectile counts separately, including simultaneous pellets and burst rounds;
-this is not a trigger counter. Missing/invalid spawn or facing data produces no
-line. Already airborne projectiles at session start are excluded. Missiles show
-first-observed facing, not a predicted trajectory. Continuous beams have their
-duration/contact readout rather than fabricated projectile shots. Coincident
-lines overlap; newest draws last. Black may be hard to see against dark space.
+Diagnostics start off each battle. Rebind shortcuts in the mod's
+`data/config/settings.json`, then restart the game.
 
-The compact title combines COMBAT DIAGNOSTICS, observed simulation time and
-Recording (or an explicit recording warning). Ship identity follows, then hull,
-flux and weapon count on one line. Page numbering appears only for multiple pages.
-Detailed shortcuts and archive explanations are in Ctrl+F7 help.
+## Features
 
-The board sizes itself to the visible content, with rounded corners, a muted teal
-border and bounded scrolling. Font parsing, layout, restriction interpretation,
-shot history and recording are separate modules. It never edits game classes,
-ship models, weapon data, AI decisions or shared SpriteAPI properties. It adds
-only its own observer/listeners, readout files and drawing; listeners are removed
-when observation ends. Rendering saves and restores its OpenGL state.
+### Weapon activity
 
-To resolve shortcut collisions, edit this mod's `data/config/settings.json`:
-`kayn_diagnostics_toggle_key`, `subject_key`, `page_key`, `help_key`, `up_key` and
-`down_key` (each with the `kayn_diagnostics_` prefix). Defaults are F8, F9, F10,
-F7, UP and DOWN; every shortcut requires Ctrl. Allowed values are F1–F12, UP
-and DOWN, with no duplicates. Invalid configuration is reported and defaults
-are retained. Restart the game after editing. These safeguards reduce conflict
-risk; they do not establish compatibility with every possible mod.
+Shows firing activity, projectile and impact counts, plus beam firing time and hit frames. Counts cover the current measurement, not trigger pulls.
 
-Freshness displays LIVE, PAUSED, FINAL / STALE or STALE / FAILED, plus age
-in simulation seconds since the last complete snapshot. Normal refresh is 0.25s;
-an age above 0.5s is stale. Pause freezes collection and history, and cached
-FIRING must be interpreted with the stale banner. Ctrl+Up/Down scrolls the panel;
-text is clipped to its bounds. Ctrl+F10 changes the six-weapon page and resets scroll.
+![Weapon activity](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-projectiles-impacts.gif)
 
-Geometry rejects non-finite muzzle/aim/range and invalid entity/shield geometry
-as UNKNOWN rather than CLEAR. Nonpositive range and zero-length aim are UNKNOWN.
-Segments are closed: endpoint touches and collinear overlap count as contact;
-the nearest overlap point is used. The existing small numeric tolerances remain
-local geometry tolerances, not a guarantee for arbitrarily scaled inputs.
-Shield boundary intersections still respect the active arc.
+### Shot directions
 
-Targets come from an active, unselected autofire group, an AI-controlled selected group (including player autopilot) with an explicit ship-AI target and aim point, or a beam currently applying damage. The nearest enemy and a manually selected ship target are never substituted as weapon intent. Ship-AI-selected intent is distinguished as SHIP_AI_SELECTED_TARGET in the TSV; it is not a guarantee that every weapon in that group can fire. The HUD separates TARGET/NO_TARGET from firing activity. The TSV retains NONE/NO_TARGET when an active autofire plugin reports no target, and UNOBSERVED/TARGET_UNKNOWN when weapon intent is unavailable (including manual control). Actual firing remains FIRING even without target evidence. A live beam contact can establish FIRING and its contact target independently of autofire. Range uses the observed contact point, or a collision-radius approximation for an autofire entity; it is not a guarantee of projectile reach. `AI_HOLD` describes the individual autofire request. `READY_OBSERVED` means the measured readiness checks passed; it does not promise that the weapon will fire or hit.
+Keeps the last five observed projectile directions per weapon, fading from green to black. Lines stay at their original world position.
 
-Recording status is visible in the panel. A failed live-file write is reported once and stops further live-file attempts for that measurement; collection and the in-memory readout continue. Finishing attempts a separate archive even after live-file failure. Archive failures identify their filename in the log and combat message area. The queue retains the exact failed report across subject changes and retries one report every five unpaused simulation seconds, including while diagnostics are disabled and after battle completion if the engine still advances this plugin. Successful writes remove only that report; other unresolved failures keep the warning visible.
+![Shot directions](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-shot-vectors.gif)
 
-The queue holds at most eight reports and 524,288 UTF-16 characters in total (up to 1 MiB of character payload, plus bounded entry overhead). Each report gets its initial write and four automatic retries. Exhausted reports remain in memory; explicitly enabling diagnostics with Ctrl+F8 grants exhausted entries another five retry attempts. Queue overflow or an oversized failed report is reported explicitly and does not evict older reports. An unqueued-loss warning remains for the rest of combat. This is an in-memory combat-local queue: pending reports do not survive the plugin being discarded or the game closing.
+### Ship status and session timer
 
-Snapshot/readout and observation runtime exceptions stop that measurement, report the failure, detach listeners on a best-effort basis and archive the last complete report with an explicit snapshotStale marker. TSV, per-slot readouts and HUD construction publish only after a complete snapshot succeeds. If the first snapshot fails, the fallback explicitly says noCompleteSnapshot instead of reusing another ship's report. Ctrl+F8 can start a fresh measurement. Runtime exceptions from diagnostic input and rendering are also contained; fatal JVM Errors are not swallowed. A broken host listener-removal API cannot be forced to remove a listener, but cleanup still attempts the remaining removals.
+Displays hull, current/max flux, weapon count, recording status and elapsed simulation time.
 
-No steering, weapon or stat changes. Collection and retry timing pause with combat. Disabling stops scans and live writes and hides the panel; pending archives may still retry. Battle end or subject loss finalizes the measurement. Returning directly out of combat before another plugin update is not guaranteed to produce a final archive; the most recent live snapshot remains.
+![Ship status and session timer](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-hull-flux-timer.gif)
 
-Automatic local files in Starsector/saves/common:
-- kayn_combat_diagnostics_live.tsv.data: latest snapshot, approximately once per simulation second.
-- kayn_combat_diagnostics_<session UUID>.tsv.data: completed measurements on disable, subject change, death or battle end.
+### Follow different ships
 
-Archive files are retained so switching ships does not discard completed results. They contain no campaign save changes. Disable the mod in the launcher and restart to remove its combat plugin entirely.
+Automatically follows your controlled ship. Switching ships archives the previous measurement and resets counters.
 
-Limits: firing line is a straight geometric estimate against intervening ships/shields/asteroids, excluding the firing hull and intended target. It is not the game's AI collision predicate and does not model turret artwork, projectile width/lead, missile paths or future motion. Range uses collision-radius approximation. Raw damage may include overkill and hulks; damage without a weapon identity remains unassigned. Very brief events may occur between snapshots. Generic/modded weapon scripts and unusual multi-entity ships need individual validation.
+![Follow different ships](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-subject-switching.gif)
 
-Verdant compatibility: prototype 0.3.5 suppresses its embedded overlay when this mod is enabled, avoiding duplicate observers/panels. Earlier prototypes may show both panels.
+### Pages, help and pause
 
-Java source and test source included. Build instructions and actual test evidence are in BUILD.md and TEST-RESULTS.md. No proprietary ship art, game classes or fonts are bundled; the installed game's font atlas provides text rendering.
+Browse weapon pages, open help and scroll long readouts. Pausing freezes collection and the timer; the panel marks cached evidence as PAUSED.
 
-## Installation packages and checks
+![Pages, help and pause](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-pages-help-pause.gif)
 
-For a binary release, extract the `KaynCombatDiagnostics` folder from the release ZIP
-into `Starsector/mods`, then enable the mod in the launcher.
-The GitHub source download needs a local build first. See BUILD.md for building and
-packaging, and RELEASE-NOTES.md for the 1.5.0 release summary.
+### Pin a selected ship
 
-GitHub checks validate documentation and 50 dependency-free math/state, geometry, font and archive-queue assertions.
-The full local game-API fixture suite and binary packaging require a local Starsector installation.
+Use Ctrl+F9 to keep observing a selected friendly or enemy ship, then return to your controlled ship. This original clip includes one blank capture frame.
 
-## License
+![Pin a selected ship](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-target-pin.gif)
 
-Project code is available under the MIT license; see LICENSE. Starsector and its bundled runtimes remain separately licensed dependencies and are not bundled.
+### Coloured weapon indicators
 
-## Demonstrations
-
-### Live combat
-
-Actual observer data from Starsector 0.98a-RC8. Clips cover individual measurement
-intervals; switching subjects resets counters. Playback is shortened from native
-screenshots and is not a frame-time recording.
-
-**Projectile and impact counts**
-
-![Projectile and impact counts](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-projectiles-impacts.gif)
-
-**Initial shot directions**
-
-![Initial shot directions](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-shot-vectors.gif)
-
-**Hull, flux and simulation timer**
-
-![Hull, flux and simulation timer](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-hull-flux-timer.gif)
-
-**Switching observed ships**
-
-![Switching observed ships](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-subject-switching.gif)
-
-**Weapon pages, help and pause**
-
-![Weapon pages, help and pause](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-pages-help-pause.gif)
-
-**Pinning a selected target**
-
-The original clip includes one blank capture frame between subjects.
-
-![Pinning a selected target](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-target-pin.gif)
-
-### Controlled display illustrations
-
-These use artificial example text in the real board renderer. They show appearance,
-colours and layout; they do not establish live AI decisions, restrictions, counts or
-file failures. Each clip includes an illustration notice.
+Shows simultaneous observations such as obstruction, range, cooldown, ammo and flux.
+These describe observed conditions; they do not reveal the AI's private reasons or
+guarantee that a weapon will fire or hit.
 
 <details>
-<summary>Show all 18 display illustrations</summary>
+<summary>Show indicator GIFs and additional display examples</summary>
+<p>These 18 clips use artificial example text to demonstrate the real panel's appearance.</p>
 
-<p><strong>Blocked</strong><br>
-<img alt="Controlled display illustration: Blocked" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-blocked.gif"></p>
+<p><strong>Blocked</strong> — An intervening ship, shield or asteroid intersects the estimated firing line.<br>
+<img alt="Display example: Blocked" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-blocked.gif"></p>
 
-<p><strong>Distance</strong><br>
-<img alt="Controlled display illustration: Distance" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-distance.gif"></p>
+<p><strong>Distance</strong> — The observed target is outside the estimated weapon range.<br>
+<img alt="Display example: Distance" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-distance.gif"></p>
 
-<p><strong>Fluxing</strong><br>
-<img alt="Controlled display illustration: Fluxing" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-fluxing.gif"></p>
+<p><strong>Fluxing</strong> — The ship is venting or lacks reported flux headroom.<br>
+<img alt="Display example: Fluxing" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-fluxing.gif"></p>
 
-<p><strong>No target</strong><br>
-<img alt="Controlled display illustration: No target" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-notarget.gif"></p>
+<p><strong>No target</strong> — No weapon target is known to the observer.<br>
+<img alt="Display example: No target" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-notarget.gif"></p>
 
-<p><strong>Damaged</strong><br>
-<img alt="Controlled display illustration: Damaged" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-damaged.gif"></p>
+<p><strong>Damaged</strong> — The weapon reports being disabled.<br>
+<img alt="Display example: Damaged" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-damaged.gif"></p>
 
-<p><strong>Cooldown</strong><br>
-<img alt="Controlled display illustration: Cooldown" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-cooldown.gif"></p>
+<p><strong>Cooldown</strong> — The weapon reports a remaining cooldown.<br>
+<img alt="Display example: Cooldown" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-cooldown.gif"></p>
 
-<p><strong>No ammo</strong><br>
-<img alt="Controlled display illustration: No ammo" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-noammo.gif"></p>
+<p><strong>No ammo</strong> — The weapon has no ammunition remaining.<br>
+<img alt="Display example: No ammo" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-noammo.gif"></p>
 
-<p><strong>Hold</strong><br>
-<img alt="Controlled display illustration: Hold" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-hold.gif"></p>
+<p><strong>Hold</strong> — The weapon reports a forced no-fire flag.<br>
+<img alt="Display example: Hold" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-hold.gif"></p>
 
-<p><strong>Arc</strong><br>
-<img alt="Controlled display illustration: Arc" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-arc.gif"></p>
+<p><strong>Arc</strong> — The observed aim point is outside the weapon arc.<br>
+<img alt="Display example: Arc" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-arc.gif"></p>
 
-<p><strong>Overload</strong><br>
-<img alt="Controlled display illustration: Overload" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-overload.gif"></p>
+<p><strong>Overload</strong> — The ship is overloaded.<br>
+<img alt="Display example: Overload" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-overload.gif"></p>
 
-<p><strong>Unknown</strong><br>
-<img alt="Controlled display illustration: Unknown" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-unknown.gif"></p>
+<p><strong>Unknown</strong> — Required evidence is missing or invalid.<br>
+<img alt="Display example: Unknown" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-unknown.gif"></p>
 
-<p><strong>AI hold</strong><br>
-<img alt="Controlled display illustration: AI hold" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-aihold.gif"></p>
+<p><strong>AI hold</strong> — The individual autofire request is false.<br>
+<img alt="Display example: AI hold" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-aihold.gif"></p>
 
-<p><strong>Beam counters</strong><br>
-<img alt="Controlled display illustration: Beam counters" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-beam.gif"></p>
+<p><strong>Beam counters</strong> — Shows beam firing time and frames with reported damage.<br>
+<img alt="Display example: Beam counters" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-beam.gif"></p>
 
-<p><strong>Projectile counters</strong><br>
-<img alt="Controlled display illustration: Projectile counters" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-projectiles.gif"></p>
+<p><strong>Projectile counters</strong> — Shows observed projectiles and impacts.<br>
+<img alt="Display example: Projectile counters" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-projectiles.gif"></p>
 
-<p><strong>Multiple restrictions</strong><br>
-<img alt="Controlled display illustration: Multiple restrictions" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-multiple.gif"></p>
+<p><strong>Multiple restrictions</strong> — Displays several conditions together, even alongside firing activity.<br>
+<img alt="Display example: Multiple restrictions" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-multiple.gif"></p>
 
-<p><strong>Evidence freshness</strong><br>
-<img alt="Controlled display illustration: Evidence freshness" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-freshness.gif"></p>
+<p><strong>Evidence freshness</strong> — Distinguishes live, paused, final and failed observations.<br>
+<img alt="Display example: Evidence freshness" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-freshness.gif"></p>
 
-<p><strong>Recording status</strong><br>
-<img alt="Controlled display illustration: Recording status" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-recording.gif"></p>
+<p><strong>Recording status</strong> — Shows recording status and file-write warnings.<br>
+<img alt="Display example: Recording status" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-recording.gif"></p>
 
-<p><strong>Help</strong><br>
-<img alt="Controlled display illustration: Help" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-help.gif"></p>
+<p><strong>Help</strong> — Displays controls and brief recording explanations.<br>
+<img alt="Display example: Help" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-help.gif"></p>
 
 </details>
 
-See the [GIF gallery](https://github.com/MysticEntry-Nova64/KaynCombatDiagnostics/blob/main/docs/media-gallery.md)
-for capture details. Game imagery remains the property of its respective owners.
+## Saved session data
+
+Reports are saved automatically in your game installation's **`Starsector/saves/common/`** folder:
+
+| File | Contents |
+| --- | --- |
+| `kayn_combat_diagnostics_live.tsv.data` | Latest snapshot, updated about once per simulation second while recording. |
+| `kayn_combat_diagnostics_<session UUID>.tsv.data` | Archived measurement, saved when you stop, switch ships, lose the observed ship or combat ends. |
+
+Reports include weapon activity, counters, target evidence and observed restrictions
+for **all weapons**, regardless of the displayed page. Open these tab-separated text
+files in a text editor or spreadsheet application. They do not change campaign saves.
+Stop diagnostics with **Ctrl+F8** before leaving combat to request a final archive.
+
+[Detailed usage and limitations](https://github.com/MysticEntry-Nova64/KaynCombatDiagnostics/blob/main/docs/reference.md) ·
+[Build instructions](https://github.com/MysticEntry-Nova64/KaynCombatDiagnostics/blob/main/BUILD.md) ·
+[Verification](https://github.com/MysticEntry-Nova64/KaynCombatDiagnostics/blob/main/TEST-RESULTS.md) ·
+[MIT license](https://github.com/MysticEntry-Nova64/KaynCombatDiagnostics/blob/main/LICENSE)
