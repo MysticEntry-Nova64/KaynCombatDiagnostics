@@ -4,3 +4,7 @@
 *.class
 *.log
 *.tsv.data
+
+# Local documentation tooling and generated site
+/.venv-docs/
+/site/

@@ -8,6 +8,14 @@ import org.lwjgl.opengl.Display;
 
 /** Compact screen-space panel, with OpenGL state restored after each draw. */
 public final class DiagnosticPanel {
+    private static final Color NORMAL = Color.WHITE;
+    private static final Color BLOCKED = new Color(255,90,90);
+    static Color lineColor(String line) {
+        return line.startsWith("!")?BLOCKED:line.startsWith("^")?Color.ORANGE:line.startsWith("~")?Color.YELLOW:NORMAL;
+    }
+    static String visibleLine(String line) {
+        return line.startsWith("!")||line.startsWith("^")||line.startsWith("~")?line.substring(1):line;
+    }
     private LazyFont.DrawableString text;
     private boolean failed;
     public void draw(String value, boolean paused) {
@@ -39,9 +47,8 @@ public final class DiagnosticPanel {
             float y=top-12*scale;
             for(String line:value.split("\n",-1)){
                 if(line.isEmpty()){y-=17*scale;continue;}
-                boolean blocked=line.startsWith("!");
-                text.setBaseColor(blocked?new Color(255,90,90):new Color(240,255,238));
-                text.setText(blocked?line.substring(1):line);text.draw(x+12*scale,y);
+                text.setBaseColor(lineColor(line));
+                text.setText(visibleLine(line));text.draw(x+12*scale,y);
                 y-=17*scale;
             }
         } finally {

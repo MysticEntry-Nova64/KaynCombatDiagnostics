@@ -1,0 +1,25 @@
+site_name: Kayn Combat Diagnostics
+site_description: Development and verification documentation for the Starsector combat observer
+repo_url: https://github.com/MysticEntry-Nova64/KaynCombatDiagnostics
+repo_name: MysticEntry-Nova64/KaynCombatDiagnostics
+edit_uri: ''
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.sections
+    - content.code.copy
+plugins:
+  - search
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: [!relative $config_dir]
+      check_paths: true
+nav:
+  - Overview: index.md
+  - Build and installation: build.md
+  - Verification evidence: verification.md
+  - Documentation workflow: documentation.md

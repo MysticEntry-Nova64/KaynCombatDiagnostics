@@ -5,8 +5,11 @@ param(
 )
 $ErrorActionPreference='Stop'
 $diagClasspath="$GameRoot/starsector-core/*;$GameRoot/mods/LazyLib/jars/*"
-$prod=Join-Path $BuildRoot 'production'
-$test=Join-Path $BuildRoot 'tests'
+# A fresh workspace prevents deleted/renamed classes from surviving a rebuild.
+# Retain previous workspaces for inspection; do not recursively delete a caller's BuildRoot.
+$runRoot=Join-Path $BuildRoot ('run-'+[Guid]::NewGuid().ToString('N'))
+$prod=Join-Path $runRoot 'production'
+$test=Join-Path $runRoot 'tests'
 New-Item -ItemType Directory -Force $prod,$test,"$PSScriptRoot/jars" | Out-Null
 $sources=Get-ChildItem "$PSScriptRoot/src" -Recurse -Filter '*.java' | ForEach-Object FullName
 $tests=Get-ChildItem "$PSScriptRoot/tests" -Filter '*.java' | ForEach-Object FullName
@@ -14,7 +17,7 @@ $tests=Get-ChildItem "$PSScriptRoot/tests" -Filter '*.java' | ForEach-Object Ful
 if($LASTEXITCODE -ne 0){throw 'Production compilation failed'}
 & "$JdkRoot/bin/javac.exe" --release 17 -cp "$prod;$diagClasspath" -d $test $tests
 if($LASTEXITCODE -ne 0){throw 'Test compilation failed'}
-foreach($name in @('DiagnosticMathTest','FiringLineTest','FiringLineIntegrationTest','DiagnosticsIntegrationTest')){
+foreach($name in @('DiagnosticMathTest','FiringLineTest','FiringLineIntegrationTest','DiagnosticsIntegrationTest','RecordingReliabilityTest','WeaponDiagnosticsTest')){
  & "$JdkRoot/bin/java.exe" -cp "$test;$prod;$diagClasspath" "kayn.diagnostics.$name"
  if($LASTEXITCODE -ne 0){throw "Failed: $name"}
 }

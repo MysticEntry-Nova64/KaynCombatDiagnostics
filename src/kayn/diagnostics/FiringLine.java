@@ -19,6 +19,19 @@ final class FiringLine {
   float qx=c.x-a.x,qy=c.y-a.y,t=(qx*sy-qy*sx)/den,u=(qx*ry-qy*rx)/den;
   return t>=0&&t<=1&&u>=0&&u<=1?t:INF;
  }
+ static float shieldHit(Vector2f a,Vector2f b,ShieldAPI shield){
+  Vector2f c=shield.getLocation();
+  float dx=b.x-a.x,dy=b.y-a.y,ox=a.x-c.x,oy=a.y-c.y;
+  float aa=dx*dx+dy*dy;if(aa<.000001f)return INF;
+  float bb=2*(ox*dx+oy*dy),cc=ox*ox+oy*oy-shield.getRadius()*shield.getRadius();
+  float disc=bb*bb-4*aa*cc;if(disc<0)return INF;
+  float root=(float)Math.sqrt(disc);
+  // Shields are arcs on the boundary, not filled circles. Either crossing may hit.
+  float entry=(-bb-root)/(2*aa),exit=(-bb+root)/(2*aa);
+  if(entry>=0&&entry<=1&&shield.isWithinArc(new Vector2f(a.x+dx*entry,a.y+dy*entry)))return entry;
+  if(exit>=0&&exit<=1&&shield.isWithinArc(new Vector2f(a.x+dx*exit,a.y+dy*exit)))return exit;
+  return INF;
+ }
  static Vector2f world(Vector2f p,CombatEntityAPI e){
   double angle=Math.toRadians(e.getFacing());float c=(float)Math.cos(angle),s=(float)Math.sin(angle);
   return new Vector2f(e.getLocation().x+p.x*c-p.y*s,e.getLocation().y+p.x*s+p.y*c);
@@ -32,8 +45,7 @@ final class FiringLine {
   }else best=circleHit(a,b,e.getLocation(),e.getCollisionRadius());
   ShieldAPI shield=e.getShield();
   if(shield!=null&&shield.isOn()){
-   float t=circleHit(a,b,shield.getLocation(),shield.getRadius());
-   if(Float.isFinite(t)&&shield.isWithinArc(new Vector2f(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t)))best=Math.min(best,t);
+   best=Math.min(best,shieldHit(a,b,shield));
   }
   return best;
  }

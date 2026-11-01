@@ -15,7 +15,7 @@ public final class DiagnosticMath {
         if (firing) return "FIRING";
         if (disabled) return "DISABLED";
         if (blocked) return "SHIP_BLOCKED";
-        if (!target) return "NO_AI_TARGET";
+        if (!target) return "NO_TARGET";
         if (!range) return "OUT_OF_RANGE";
         if (!arc) return "OUT_OF_ARC";
         return wantsFire ? "READY_OBSERVED" : "AI_HOLD";

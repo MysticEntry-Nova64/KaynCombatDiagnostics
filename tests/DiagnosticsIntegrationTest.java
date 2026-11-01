@@ -59,14 +59,39 @@ public class DiagnosticsIntegrationTest {
   projectiles.add(projectile);d.advance(.5f,List.of());hit=true;d.advance(.5f,List.of());d.advance(.5f,List.of());
   check(d.snapshot("gun-a").contains("\t1\t1\t0\t"),"projectile/impact deduplication");
   check(d.snapshot("gun-a").contains("FIRING"),"actual firing overrides no individual AI request");
+  boolean[] finalHit={false};
+  DamagingProjectileAPI finalFrame=fake(DamagingProjectileAPI.class,(n,a)->switch(n){case "getSource"->hunter;case "getWeapon"->weapons.get(0);case "didDamage"->finalHit[0];case "getDamageTarget"->enemy;default->null;});
+  projectiles.add(finalFrame);d.advance(.5f,List.of());
+  check(d.snapshot("gun-a").contains("\t2\t1\t0\t"),"a new projectile is not counted as a hit before impact");
+  finalHit[0]=true;projectiles.remove(finalFrame);d.advance(.5f,List.of());
+  check(d.snapshot("gun-a").contains("\t2\t2\t0\t"),"a disappearing projectile's final impact is counted");
+  finalHit[0]=false;projectiles.add(finalFrame);d.advance(.5f,List.of());projectiles.remove(finalFrame);d.advance(.5f,List.of());
+  check(d.snapshot("gun-a").contains("\t3\t2\t0\t"),"a removed projectile with no damage is not counted as a hit");
   int before=writes;String state=d.snapshot("");paused=true;d.advance(5,List.of());check(writes==before&&state.equals(d.snapshot("")),"pause freezes collection");
   press(d,org.lwjgl.input.Keyboard.KEY_F8);check(listeners.isEmpty(),"disable while paused removes listeners");before=writes;paused=false;d.advance(5,List.of());check(writes==before,"disabled stops writes");
   press(d,org.lwjgl.input.Keyboard.KEY_F8);d.advance(.5f,List.of());check(d.snapshot("gun-a").contains("\t0\t0\t0\t"),"fresh session excludes pre-existing projectile");
   press(d,org.lwjgl.input.Keyboard.KEY_F9);d.advance(.5f,List.of());check(d.snapshot("").contains("enemy-2")&&!d.snapshot("").contains("gun-a\t"),"target mode switches subject and resets weapon rows");
   press(d,org.lwjgl.input.Keyboard.KEY_F9);d.advance(.5f,List.of());check(d.snapshot("").contains("ordinary-1"),"return to player");
   player=enemy;d.advance(.5f,List.of());check(d.snapshot("").contains("enemy-2"),"automatic player ship transfer");
-  ended=true;d.advance(.1f,List.of());check(file.contains("ended=true")&&listeners.isEmpty(),"combat end finalizes and detaches");
+  before=writes;ended=true;player=hunter;d.advance(.1f,List.of());
+  check(file.contains("ended=true")&&listeners.isEmpty(),"combat end finalizes and detaches");
+  check(writes==before+2&&d.snapshot("").contains("enemy-2"),
+      "combat end with simultaneous subject change only finalizes the existing session");
   before=writes;d.advance(5,List.of());check(writes==before,"no writes after end");
+  state=d.snapshot("");player=hunter;d.advance(.5f,List.of());
+  check(writes==before&&state.equals(d.snapshot(""))&&listeners.isEmpty(),
+      "subject change after combat end cannot start another measurement");
+  press(d,org.lwjgl.input.Keyboard.KEY_F9);d.advance(.5f,List.of());
+  check(writes==before&&state.equals(d.snapshot("")),"target toggle after end preserves final snapshot");
+  press(d,org.lwjgl.input.Keyboard.KEY_F8);press(d,org.lwjgl.input.Keyboard.KEY_F8);d.advance(.5f,List.of());
+  check(writes==before&&state.equals(d.snapshot(""))&&listeners.isEmpty(),
+      "off/on after end cannot restart collection");
+  CombatDiagnostics late=new CombatDiagnostics("already ended");late.init(engine);
+  press(late,org.lwjgl.input.Keyboard.KEY_F8);late.advance(.5f,List.of());
+  check(writes==before&&listeners.isEmpty(),"first enable after combat end writes no empty session");
+  ended=false;d.advance(.5f,List.of());late.advance(.5f,List.of());
+  check(writes==before&&state.equals(d.snapshot(""))&&listeners.isEmpty(),
+      "combat completion remains terminal if the engine flag later clears");
   System.out.println("PASS: "+assertions+" standalone lifecycle assertions (API fixtures)");
  }
 }

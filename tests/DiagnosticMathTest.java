@@ -9,7 +9,7 @@ public class DiagnosticMathTest {
   check(DiagnosticMath.state(true,false,false,false,false,false,false)=="FIRING","observed firing priority");
   check(DiagnosticMath.state(false,true,false,false,false,false,false)=="DISABLED","disabled");
   check(DiagnosticMath.state(false,false,true,false,false,false,false)=="SHIP_BLOCKED","flux restriction");
-  check(DiagnosticMath.state(false,false,false,false,true,true,true)=="NO_AI_TARGET","no invented target");
+  check(DiagnosticMath.state(false,false,false,false,true,true,true)=="NO_TARGET","no invented target");
   check(DiagnosticMath.state(false,false,false,true,false,true,true)=="OUT_OF_RANGE","range");
   check(DiagnosticMath.state(false,false,false,true,true,false,true)=="OUT_OF_ARC","arc");
   check(DiagnosticMath.state(false,false,false,true,true,true,false)=="AI_HOLD","AI hold");
