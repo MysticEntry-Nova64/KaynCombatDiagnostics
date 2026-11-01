@@ -1,6 +1,6 @@
 # Build from source
 
-Requires PowerShell, a JDK 17 or newer, Starsector 0.98a-RC8 with no external mod libraries. Obtain the game separately; their JARs are not redistributed here.
+Requires PowerShell, a JDK 17 or newer, Starsector 0.98a-RC8 with no external mod libraries. Obtain the game separately; its JARs are not redistributed here.
 
 ```powershell
 ./build.ps1 -GameRoot 'D:/Games/Starsector' -JdkRoot 'C:/Program Files/Java/jdk-17'
@@ -50,7 +50,8 @@ and its `.sha256` file. Existing release outputs are preserved; select a fresh
 The package excludes proprietary dependencies, tests, captures and local data.
 
 Validate an existing ZIP with
-`./tests/ReleasePackageTest.ps1 -ZipPath './dist/KaynCombatDiagnostics-1.5.0.zip' -ExpectedVersion '1.5.0'`.
+`./tests/ReleasePackageTest.ps1 -ZipPath './dist/KaynCombatDiagnostics-1.5.0.zip' -ExpectedVersion '1.5.0'`. If omitted, `-ExpectedVersion` defaults to the version
+in the checkout's `mod_info.json`; supply it explicitly when checking an older release.
 RELEASE-NOTES.md contains installation and release details. The binary ZIP omits
 source and build scripts; obtain the full checkout from GitHub to rebuild it.
 

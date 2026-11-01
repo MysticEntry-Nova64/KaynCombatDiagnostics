@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$ZipPath,
-    [string]$ExpectedVersion = '1.3.0'
+    [string]$ExpectedVersion = (Get-Content -LiteralPath (Join-Path $PSScriptRoot '../mod_info.json') -Raw | ConvertFrom-Json).version
 )
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem

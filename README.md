@@ -109,4 +109,102 @@ Project code is available under the MIT license; see LICENSE. Starsector and its
 
 ## Demonstrations
 
-See the [GIF gallery](https://github.com/MysticEntry-Nova64/KaynCombatDiagnostics/blob/main/docs/media-gallery.md) for live combat footage and clearly labelled display illustrations. The latter demonstrate appearance, not live AI evidence.
+### Live combat
+
+Actual observer data from Starsector 0.98a-RC8. Clips cover individual measurement
+intervals; switching subjects resets counters. Playback is shortened from native
+screenshots and is not a frame-time recording.
+
+**Projectile and impact counts**
+
+![Projectile and impact counts](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-projectiles-impacts.gif)
+
+**Initial shot directions**
+
+![Initial shot directions](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-shot-vectors.gif)
+
+**Hull, flux and simulation timer**
+
+![Hull, flux and simulation timer](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-hull-flux-timer.gif)
+
+**Switching observed ships**
+
+![Switching observed ships](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-subject-switching.gif)
+
+**Weapon pages, help and pause**
+
+![Weapon pages, help and pause](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-pages-help-pause.gif)
+
+**Pinning a selected target**
+
+The original clip includes one blank capture frame between subjects.
+
+![Pinning a selected target](https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/live-target-pin.gif)
+
+### Controlled display illustrations
+
+These use artificial example text in the real board renderer. They show appearance,
+colours and layout; they do not establish live AI decisions, restrictions, counts or
+file failures. Each clip includes an illustration notice.
+
+<details>
+<summary>Show all 18 display illustrations</summary>
+
+<p><strong>Blocked</strong><br>
+<img alt="Controlled display illustration: Blocked" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-blocked.gif"></p>
+
+<p><strong>Distance</strong><br>
+<img alt="Controlled display illustration: Distance" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-distance.gif"></p>
+
+<p><strong>Fluxing</strong><br>
+<img alt="Controlled display illustration: Fluxing" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-fluxing.gif"></p>
+
+<p><strong>No target</strong><br>
+<img alt="Controlled display illustration: No target" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-notarget.gif"></p>
+
+<p><strong>Damaged</strong><br>
+<img alt="Controlled display illustration: Damaged" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-damaged.gif"></p>
+
+<p><strong>Cooldown</strong><br>
+<img alt="Controlled display illustration: Cooldown" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-cooldown.gif"></p>
+
+<p><strong>No ammo</strong><br>
+<img alt="Controlled display illustration: No ammo" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-noammo.gif"></p>
+
+<p><strong>Hold</strong><br>
+<img alt="Controlled display illustration: Hold" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-hold.gif"></p>
+
+<p><strong>Arc</strong><br>
+<img alt="Controlled display illustration: Arc" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-arc.gif"></p>
+
+<p><strong>Overload</strong><br>
+<img alt="Controlled display illustration: Overload" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-overload.gif"></p>
+
+<p><strong>Unknown</strong><br>
+<img alt="Controlled display illustration: Unknown" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-unknown.gif"></p>
+
+<p><strong>AI hold</strong><br>
+<img alt="Controlled display illustration: AI hold" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-aihold.gif"></p>
+
+<p><strong>Beam counters</strong><br>
+<img alt="Controlled display illustration: Beam counters" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-beam.gif"></p>
+
+<p><strong>Projectile counters</strong><br>
+<img alt="Controlled display illustration: Projectile counters" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-projectiles.gif"></p>
+
+<p><strong>Multiple restrictions</strong><br>
+<img alt="Controlled display illustration: Multiple restrictions" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-multiple.gif"></p>
+
+<p><strong>Evidence freshness</strong><br>
+<img alt="Controlled display illustration: Evidence freshness" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-freshness.gif"></p>
+
+<p><strong>Recording status</strong><br>
+<img alt="Controlled display illustration: Recording status" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-recording.gif"></p>
+
+<p><strong>Help</strong><br>
+<img alt="Controlled display illustration: Help" src="https://raw.githubusercontent.com/MysticEntry-Nova64/KaynCombatDiagnostics/main/docs/media/display-help.gif"></p>
+
+</details>
+
+See the [GIF gallery](https://github.com/MysticEntry-Nova64/KaynCombatDiagnostics/blob/main/docs/media-gallery.md)
+for capture details. Game imagery remains the property of its respective owners.

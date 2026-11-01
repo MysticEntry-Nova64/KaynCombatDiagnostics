@@ -10,27 +10,29 @@ font files or test mission are included in the runtime mod ZIP.
 These use actual observer data from ordinary ships and game AI. Counts reflect
 only each measurement interval. Subject-switching clips intentionally reset.
 
-### Projectiles Impacts
+### Projectiles and impacts
 
 ![live-projectiles-impacts.gif](media/live-projectiles-impacts.gif)
 
-### Shot Vectors
+### Shot vectors
 
 ![live-shot-vectors.gif](media/live-shot-vectors.gif)
 
-### Hull Flux Timer
+### Hull, flux and timer
 
 ![live-hull-flux-timer.gif](media/live-hull-flux-timer.gif)
 
-### Subject Switching
+### Subject switching
 
 ![live-subject-switching.gif](media/live-subject-switching.gif)
 
-### Pages Help Pause
+### Pages, help and pause
 
 ![live-pages-help-pause.gif](media/live-pages-help-pause.gif)
 
-### Target Pin
+### Target pinning
+
+The original clip includes one blank capture frame between subjects.
 
 ![live-target-pin.gif](media/live-target-pin.gif)
 
@@ -54,7 +56,7 @@ visual documentation only. Actual firing can coexist with observed restrictions.
 
 ![Controlled display illustration: display-fluxing.gif](media/display-fluxing.gif)
 
-### Notarget
+### No target
 
 ![Controlled display illustration: display-notarget.gif](media/display-notarget.gif)
 
@@ -66,7 +68,7 @@ visual documentation only. Actual firing can coexist with observed restrictions.
 
 ![Controlled display illustration: display-cooldown.gif](media/display-cooldown.gif)
 
-### Noammo
+### No ammo
 
 ![Controlled display illustration: display-noammo.gif](media/display-noammo.gif)
 
@@ -86,7 +88,7 @@ visual documentation only. Actual firing can coexist with observed restrictions.
 
 ![Controlled display illustration: display-unknown.gif](media/display-unknown.gif)
 
-### Aihold
+### AI hold
 
 ![Controlled display illustration: display-aihold.gif](media/display-aihold.gif)
 

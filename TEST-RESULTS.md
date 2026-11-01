@@ -1,3 +1,34 @@
+## GitHub source, wording and README audit — 1 November 2026
+
+Reviewed all 18 production Java source files, build/package scripts, configuration,
+workflow and documentation at `a2ebe7b` (1.5.0). No additional production Java
+bug was confirmed by this review. This is bounded source and fixture evidence,
+not an exhaustive correctness or compatibility guarantee.
+
+Reproduced a release-validator bug: a valid freshly built 1.5.0 ZIP passed with
+an explicit version but failed with `Wrong release identity` when the optional
+version was omitted, because the default was still hard-coded to 1.3.0.
+`tests/ReleasePackageTest.ps1` now defaults to the checkout's `mod_info.json` version.
+The same ZIP passes without an override; an explicit incorrect 1.3.0 still fails.
+No production Java or runtime metadata was changed.
+
+Corrected gallery headings and build-guide grammar. README now embeds all six
+live clips and 18 labelled display illustrations. Absolute raw-media URLs also
+work when README is included in the MkDocs homepage. The documentation checker
+validates generated homepage image paths, GIF headers and coverage of every
+repository GIF. All 24 animations decoded completely; a contact sheet and all
+four target-pinning frames were opened for inspection. The original target-pin
+clip contains one blank capture frame; it is disclosed beside the clip, and
+original footage is preserved.
+
+Fresh local checks: 333 assertions across ten game-API fixture programs; 50
+portable assertions; the two-build stale/test-class packaging regression; release
+ZIP layout and Java 17 payload validation; strict MkDocs build and searchable
+content/image checks. Failure-injection logs contain expected controlled errors.
+Compiler/runtime: installed JDK 27.0.1.0.3 with `--release 17`; docs use the
+project `.venv-docs` environment. No new game launch or live combat test was
+performed for this audit. Earlier live results below retain their dated scope.
+
 ## 1.5.0 audit and verification — 1 November 2026
 
 Ten local programs report **333 passing assertions**, zero failed assertions:
