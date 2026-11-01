@@ -1,3 +1,25 @@
+## v1.3.0 release-package preparation (2026-11-01, local review)
+
+README now states that the individual AI firing request is in TSV `aiShouldFire`,
+not a separate HUD field. Production Java is unchanged from tagged v1.3.0.
+The full local build passed all 178 assertions with JDK 27, targeting Java 17.
+The new dependency-free CI command passed its 19 math/state assertions locally.
+Strict documentation generation and checks of four pages/search content passed;
+the documentation environment's dependency check passed.
+
+The binary ZIP validator passed for the 1.3.0 package, including its manifest,
+plugin registration, allowlisted documentation/runtime files, production entry
+class and Java 17 bytecode. Deliberately missing-JAR, unexpected-file and wrong-version
+archives were rejected. The packaging command refused to overwrite an existing
+release and preserved its checksum. The package contains no proprietary dependencies.
+
+GitHub Actions configuration is prepared for documentation and dependency-free
+Java checks on pushes and pull requests, using pinned action revisions and read-only
+repository permissions. Its YAML was parsed locally; no hosted Actions execution
+has occurred before push. Full game-dependent tests remain local. No new game launch,
+game installation change, tag movement, push or release publication was performed
+for this preparation. Earlier gameplay evidence below retains its original limits.
+
 ## v1.3.0 publication verification (2026-11-01)
 
 Release metadata and README now identify version 1.3.0. The source build passed all

@@ -10,7 +10,7 @@ Its purpose is to check weapons on custom ship designs: observed firing, project
 
 Automatically follows changes to the controlled ship in self mode. Switching subjects closes the previous measurement and resets counters. Target mode stays pinned until toggled back. Counters cover only the enabled observation interval. Decorative weapons are skipped. Modules/fighters are separate ships: target or control the specific entity to inspect it; this does not aggregate parent and module weapons.
 
-The panel shows hull, flux, recording status, actual FIRING status, weapon group number, SELECTED/AUTO/MANUAL control mode, individual AI firing request, approximate range MET/OUT, geometry CLEAR/BLOCKED, projectiles/impacts, and beam firing time with observed hit frames. Weapon text is white by default. The panel shows NO_TARGET when no target is observed, and TARGET SHIP/MISSILE/PROJECTILE/POINT when target evidence is available. Unknown range and line show ?. An observed out-of-range target makes the entry yellow; venting that blocks firing makes it orange; an observed firing-line obstruction makes it red. Red takes priority over orange, then yellow, then white. Beam hit frames count damage-bearing updates, not separate shots. FIRING is observed independently of the individual autofire AI. The detailed file retains readyObserved as an individual-AI readiness estimate, not a group-fire permission flag.
+The panel shows hull, flux, recording status, actual FIRING status, weapon group number, SELECTED/AUTO/MANUAL control mode, approximate range MET/OUT, geometry CLEAR/BLOCKED, projectiles/impacts, and beam firing time with observed hit frames. The individual AI firing request is recorded as aiShouldFire in the TSV; it is not displayed as a separate panel field. Weapon text is white by default. The panel shows NO_TARGET when no target is observed, and TARGET SHIP/MISSILE/PROJECTILE/POINT when target evidence is available. Unknown range and line show ?. An observed out-of-range target makes the entry yellow; venting that blocks firing makes it orange; an observed firing-line obstruction makes it red. Red takes priority over orange, then yellow, then white. Beam hit frames count damage-bearing updates, not separate shots. FIRING is observed independently of the individual autofire AI. The detailed file retains readyObserved as an individual-AI readiness estimate, not a group-fire permission flag.
 
 Known observations take priority over an apparent ready state: `COOLDOWN`, `FORCED_NO_FIRE`, `NO_AMMO` and `FLUX_HEADROOM_LOW` identify current measured restrictions. Disabled weapons and ship-level flux restrictions retain their existing priority, and actual `FIRING` remains independent of those readiness estimates. More than one restriction may exist; the TSV retains the separate flags and values. `FLUX_HEADROOM_LOW` compares the reported firing cost with current flux headroom; unusual scripts and beam behavior still need individual validation.
 
@@ -31,6 +31,16 @@ Limits: firing line is a straight geometric estimate against intervening ships/s
 Verdant compatibility: prototype 0.3.5 suppresses its embedded overlay when this mod is enabled, avoiding duplicate observers/panels. Earlier prototypes may show both panels.
 
 Java source and test source included. Build instructions and actual test evidence are in BUILD.md and TEST-RESULTS.md. No proprietary ship art, game classes or fonts are bundled; LazyLib and the game's installed font provide text rendering.
+
+## Installation packages and checks
+
+For a binary release, extract the `KaynCombatDiagnostics` folder from the release ZIP
+into `Starsector/mods`, install LazyLib separately, then enable the mod in the launcher.
+The GitHub source download needs a local build first. See BUILD.md for building and
+packaging, and RELEASE-NOTES.md for the 1.3.0 release summary.
+
+GitHub checks validate documentation and the 19 dependency-free math/state assertions.
+The full 178-assertion suite and binary packaging require a local Starsector installation.
 
 ## License
 

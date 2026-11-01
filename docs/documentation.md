@@ -12,7 +12,8 @@ python -m venv .venv-docs
 
 Open <http://127.0.0.1:8000> while the preview runs; Ctrl+C stops it.
 Generated output goes into `site/`. The environment and generated site are ignored by Git.
-No publication or GitHub Pages deployment is configured.
+GitHub checks build the documentation and check its generated/searchable content
+on pushes and pull requests. No publication or GitHub Pages deployment is configured.
 
 ## Editing
 
